@@ -57,8 +57,8 @@ class FirstPersonCamera {
     // Jumping variables
     this.isJumping = false;
     this.jumpVelocity = 0; // Vertical speed during jump
-    this.gravity = -34; // Gravity constant
-    this.jumpHeight = 14; // Max height of the jump
+    this.gravity = -54; // Gravity constant
+    this.jumpHeight = 8; // Max height of the jump
     this.groundLevel = 2; // Y position of the ground
       // Audio listener setup
     const listener = new THREE.AudioListener();
@@ -179,7 +179,7 @@ class FirstPersonCamera {
     // Handle jumping
     if (!this.isJumping && this.input_.key(32)) { // Spacebar key for jumping
       this.isJumping = true;
-      const sprintFactor = isSprinting ? 1.5 : 1; // Jump higher if sprinting
+      const sprintFactor = isSprinting ? 1.2 : 1; // Jump higher if sprinting
       this.jumpVelocity = Math.sqrt(2 * -this.gravity * this.jumpHeight) * sprintFactor;
     }
   
