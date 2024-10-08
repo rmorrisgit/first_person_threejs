@@ -40,7 +40,7 @@ class FirstPersonCamera {
     this.headBobActive_ = false;
     this.headBobTimer_ = 0;
     this.headBobSpeed_ = 15;
-    this.headBobHeight_ = .1;
+    this.headBobHeight_ = 0.01;
     this.walkSpeed_ = 10;
     this.strafeSpeed_ = 10;
 
@@ -536,47 +536,50 @@ class FirstPersonCameraDemo {
 
   raf_() {
     requestAnimationFrame((t) => {
-      // Initialize previousRAF_ on the first call
-      if (this.previousRAF_ === null) {
-        this.previousRAF_ = t;
-      }
-      this.inputController.update(); // Update input states
+        // Initialize previousRAF_ on the first call
+        if (this.previousRAF_ === null) {
+            this.previousRAF_ = t;
+        }
 
-      // Start measuring performance
-      this.stats.begin(); 
-      this.step_(t - this.previousRAF_); // Update the scene
-  
-      // Clear the scene
-      this.threejs_.autoClear = true;
-      this.threejs_.render(this.scene_, this.camera_); // Render the main scene
-      this.threejs_.autoClear = false; // Reset autoClear to false for UI rendering
-      this.threejs_.render(this.uiScene_, this.uiCamera_); // Render the UI scene
-      this.stats.end(); // Stop measuring
-  
-      // Update FPS and frame count
-      this.frameCount++;
-      const currentTime = performance.now();
-      if (currentTime - this.lastTime >= 1000) { // Update FPS once per second
-        this.fps = this.frameCount; // Save the frame count for this second
-        this.frameCount = 0; // Reset for the next second
-        this.lastTime = currentTime; // Update last time
-      }
-  
-      // Update previousRAF_ for the next frame
-      this.previousRAF_ = t;
-  
-      // Call the next frame
-      this.raf_();
+        const timeElapsed = t - this.previousRAF_; // Time since last frame in milliseconds
+        this.previousRAF_ = t; // Update previousRAF_ for the next frame
+
+        // Convert to seconds for better accuracy
+        const timeElapsedS = timeElapsed * 0.001; // Convert milliseconds to seconds
+
+        this.inputController.update(); // Update input states
+
+        // Start measuring performance
+        this.stats.begin(); 
+        this.step_(timeElapsedS); // Update the scene with time in seconds
+
+        // Clear the scene
+        this.threejs_.autoClear = true;
+        this.threejs_.render(this.scene_, this.camera_); // Render the main scene
+        this.threejs_.autoClear = false; // Reset autoClear to false for UI rendering
+        this.threejs_.render(this.uiScene_, this.uiCamera_); // Render the UI scene
+        this.stats.end(); // Stop measuring
+
+        // Update FPS and frame count
+        this.frameCount++;
+        const currentTime = performance.now();
+        if (currentTime - this.lastTime >= 1000) { // Update FPS once per second
+            this.fps = this.frameCount; // Save the frame count for this second
+            this.frameCount = 0; // Reset for the next second
+            this.lastTime = currentTime; // Update last time
+        }
+
+        // Call the next frame
+        this.raf_();
     });
-  }
+}
 
-  
+step_(timeElapsedS) {
+    // Use timeElapsedS for updates
+    this.fpsCamera_.update(timeElapsedS); // Example usage
+    // Other updates that depend on the elapsed time can go here
+}
 
-  step_(timeElapsed) {
-    const timeElapsedS = timeElapsed * 0.001;
-    this.fpsCamera_.update(timeElapsedS);
-    
-  }
 }
 
 
