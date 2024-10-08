@@ -406,7 +406,9 @@ class FirstPersonCameraDemo {
     wall1.position.set(0, -40, -50);
     wall1.castShadow = true;
     wall1.receiveShadow = true;
-
+// Add bounding box for the wall
+wall1.geometry.computeBoundingBox();
+wall1.boundingBox = new THREE.Box3().setFromObject(wall1);
     this.scene_.add(wall1);
 
     const wall2 = new THREE.Mesh(
@@ -468,8 +470,13 @@ spawnCubes(count) {
       );
         this.cubes.push(cube);
         this.scene_.add(cube); // Add cube to the scene
+          // Create bounding box for the cube
+    cube.geometry.computeBoundingBox();
+    cube.boundingBox = new THREE.Box3().setFromObject(cube); // Save the bounding box
+  
     }
 }
+
   initializeLights_() {
     const distance = 50.0;
     const angle = Math.PI / 4.0;
@@ -569,6 +576,33 @@ spawnCubes(count) {
         // Start measuring performance
         this.stats.begin(); 
         this.step_(timeElapsedS); // Update the scene with time in seconds
+        const playerBoundingBox = new THREE.Box3(
+          new THREE.Vector3(
+            this.camera_.position.x - 1,
+            this.camera_.position.y - 1,
+            this.camera_.position.z - 1
+          ),
+          new THREE.Vector3(
+            this.camera_.position.x + 1,
+            this.camera_.position.y + 1,
+            this.camera_.position.z + 1
+          )
+        );
+           // Check collisions with cubes
+   // Inside the collision check loop
+// Check collisions with cubes
+for (const cube of this.cubes) {
+  if (playerBoundingBox.intersectsBox(cube.boundingBox)) {
+      console.log('Collision detected with cube!');
+      
+      // Example collision response: Change the cube's color
+      cube.material.color.set(0xff0000); // Change to red
+      
+      // Optionally, move the player back a bit
+  }
+}
+
+
 
         // Clear the scene
         this.threejs_.autoClear = true;
