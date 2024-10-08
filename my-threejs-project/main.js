@@ -273,6 +273,10 @@ class FirstPersonCameraDemo {
     this.controls = null; // Ensure this is initialized correctly
     this.scene = null; // Ensure this is initialized correctly
     this.inputController = null; // Declare the input controller
+    
+    this.cubes = []; // To store cube references
+    this.objects_ = [];
+    // Initialize and add cubes
 
     this.initialize_();
     this.fps = 0;  // Initialize fps variable
@@ -402,6 +406,7 @@ class FirstPersonCameraDemo {
     wall1.position.set(0, -40, -50);
     wall1.castShadow = true;
     wall1.receiveShadow = true;
+
     this.scene_.add(wall1);
 
     const wall2 = new THREE.Mesh(
@@ -428,31 +433,43 @@ class FirstPersonCameraDemo {
     wall4.receiveShadow = true;
     this.scene_.add(wall4);
 
-    // Create Box3 for each mesh in the scene so that we can
+       // Create Box3 for each mesh in the scene so that we can
     // do some easy intersection tests.
-    const meshes = [
-      plane, box, wall1, wall2, wall3, wall4];
 
-    this.objects_ = [];
+    
 
-    for (let i = 0; i < meshes.length; ++i) {
-      const b = new THREE.Box3();
-      b.setFromObject(meshes[i]);
-      this.objects_.push(b);
-    }
-
+   
     // Crosshair
     const crosshair = mapLoader.load('resources/crosshair.png');
     crosshair.anisotropy = maxAnisotropy;
 
     this.sprite_ = new THREE.Sprite(
-      new THREE.SpriteMaterial({map: crosshair, color: 0xffffff, fog: false, depthTest: false, depthWrite: false}));
-    this.sprite_.scale.set(0.15, 0.15 * this.camera_.aspect, 1)
+        new THREE.SpriteMaterial({ map: crosshair, color: 0xffffff, fog: false, depthTest: false, depthWrite: false })
+    );
+    this.sprite_.scale.set(0.15, 0.15 * this.camera_.aspect, 1);
     this.sprite_.position.set(0, 0, -10);
-
     this.uiScene_.add(this.sprite_);
-  }
 
+    // Call spawnCubes here with the desired count
+    this.spawnCubes(50); // Adjust the count as needed
+}
+
+spawnCubes(count) {
+  const geometry = new THREE.BoxGeometry(4, 4, 4); // Adjust size to 4x4x4 for larger cubes
+  const material = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
+    
+    for (let i = 0; i < count; i++) {
+        const cube = new THREE.Mesh(geometry, material);
+        // Randomly position the cubes within a certain range
+        cube.position.set(
+          (Math.random() - 0.5) * 100, // x position range from -50 to 50
+          Math.random() * 25 + 2,      // y position range from 2 to 52 (above ground level)
+          (Math.random() - 0.5) * 100   // z position range from -50 to 50
+      );
+        this.cubes.push(cube);
+        this.scene_.add(cube); // Add cube to the scene
+    }
+}
   initializeLights_() {
     const distance = 50.0;
     const angle = Math.PI / 4.0;
