@@ -349,10 +349,7 @@ class FirstPersonCameraDemo {
   
     document.body.appendChild(this.threejs_.domElement);
   
-    // Add click event to request pointer lock
-    document.body.addEventListener('click', () => {
-      document.body.requestPointerLock();
-    });
+  
   
     window.addEventListener('resize', () => {
       this.onWindowResize_();
@@ -519,12 +516,19 @@ createCubes() {
     this.createCube(position); // Create cube at grid position
   });
 }
-  spawnCubes(count) {
-    const positions = this.grid.slice(); // Get predefined grid positions
-    for (let i = 0; i < Math.min(count, positions.length); i++) {
-      this.createCube(positions[i]); // Create cube at grid position
+ spawnCubes(count) {
+    const availablePositions = this.grid.slice(); // Copy of grid positions
+
+    for (let i = 0; i < count; i++) {
+        const randomIndex = Math.floor(Math.random() * availablePositions.length);
+        const position = availablePositions[randomIndex];
+
+        this.createCube(position);
+        // Remove the position from the available positions to prevent overlap
+        availablePositions.splice(randomIndex, 1);
     }
-  }
+}
+
 
   handleFallingCubes() {
     for (const cube of this.cubes) {
