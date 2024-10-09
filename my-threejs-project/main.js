@@ -12,13 +12,9 @@ const KEYS = {
   'd': 68, // D
   'shift': 16 // Shift
 };
-
-
 function clamp(x, a, b) {
   return Math.min(Math.max(x, a), b);
 }
-
-
 class FirstPersonCamera {
   constructor(camera, objects) {
     this.camera_ = camera;
@@ -47,6 +43,8 @@ class FirstPersonCamera {
     this.objects_ = objects;
 
     
+
+
     this.rechargeRate = 0.05; // Rate at which the charge recovers
     this.chargeRecoverDelay = 2; // Delay before charge starts recovering after sprinting
     this.lastSprintedAt = null; // Store the last time the player sprinted
@@ -263,60 +261,76 @@ updateRotation_(timeElapsedS) {
 }
 }
 
-
-
+// Variables to control the spawning and falling
+const FALL_SPEED = 0.1; // Adjust the fall speed
+const CUBE_SIZE = 2; // Size of each cube
+const START_HEIGHT = 10; // Height from which the cubes start falling
 
 
 class FirstPersonCameraDemo {
   constructor() {
     this.camera = null; // Ensure this is initialized correctly
     this.controls = null; // Ensure this is initialized correctly
-    this.scene = null; // Ensure this is initialized correctly
     this.inputController = null; // Declare the input controller
-    
+    this.scene = new THREE.Scene(); // Make sure this line exists
+
     this.cubes = []; // To store cube references
     this.objects_ = [];
+    this.slotSize = 3; // Change this if your cube size is different
+    this.gridSize = 10; // Desired grid size (10x10)
+    this.grid = this.createGrid(this.gridSize);
+
     // Initialize and add cubes
+    this.initializeRenderer_(); // Ensure this is called early
 
     this.initialize_();
+    this.createCubes(); // Create the cubes after generating the grid
+
+    this.spawnCubes(50); // Call to spawn cubes
+
+    // Initialize Stats
+
     this.fps = 0;  // Initialize fps variable
     this.frameCount = 0; // Frame count for FPS calculation
     this.lastTime = performance.now(); // Store the last time for FPS calculation
-        // Initialize Stats
-        this.stats = new Stats();
-        this.stats.showPanel(0); // 0: fps, 1: ms, 2: memory
 
-        this.stats.dom.style.position = 'absolute';
-        this.stats.dom.style.top = '10px';
-        this.stats.dom.style.left = '10px';
-        this.stats.dom.style.opacity = '0.9';
-        this.stats.dom.style.zIndex = '10000';
-    
-        // Increase the size of the canvas directly
-        const canvas = this.stats.dom.children[0]; // Access the canvas element directly
-        canvas.style.width = '200px';  // Set desired width
-        canvas.style.height = '100px'; // Set desired height
-    
-        document.body.appendChild(this.stats.dom);
+    this.initStats();
+    this.update(); // Start the update loop
 
-      }
-  
-
-  initialize_() {
-    this.initializeRenderer_();
-    this.initializeLights_();
-    this.initializeScene_();
-    this.initializePostFX_();
-    this.initializeDemo_();
-    this.inputController = new InputController(document.body);
-
-   
-
+    // Start the animation loop
     this.previousRAF_ = null;
     this.raf_();
     this.onWindowResize_();
   }
+  // Initialize FPS stats
+  initStats() {
+    this.stats = new Stats();
+    this.stats.showPanel(0); // 0: fps, 1: ms, 2: memory
 
+    this.stats.dom.style.position = 'absolute';
+    this.stats.dom.style.top = '10px';
+    this.stats.dom.style.left = '10px';
+    this.stats.dom.style.opacity = '0.9';
+    this.stats.dom.style.zIndex = '10000';
+
+    const canvas = this.stats.dom.children[0]; // Access the canvas element directly
+    canvas.style.width = '200px';  // Set desired width
+    canvas.style.height = '100px'; // Set desired height
+
+    document.body.appendChild(this.stats.dom);
+  }
+
+  update() {
+    this.handleFallingCubes(); // Handle cube falling logic
+    this.stats.update(); // Update stats
+    requestAnimationFrame(this.update.bind(this)); // Loop the update
+  }
+  initialize_() {
+    this.initializeLights_();
+    this.initializeScene_();
+    this.initializeDemo_();
+    this.inputController = new InputController(document.body);
+  }
   initializeDemo_() {
     this.fpsCamera_ = new FirstPersonCamera(this.camera_, this.objects_);
 
@@ -352,7 +366,8 @@ class FirstPersonCameraDemo {
     this.camera_.position.set(0, 2, 0);
   
     this.scene_ = new THREE.Scene();
-  
+    this.spawnCubes(50); // Adjust the count as needed
+
     this.uiCamera_ = new THREE.OrthographicCamera(
         -1, 1, 1 * aspect, -1 * aspect, 1, 1000);
     this.uiScene_ = new THREE.Scene();
@@ -435,12 +450,6 @@ wall1.boundingBox = new THREE.Box3().setFromObject(wall1);
     wall4.receiveShadow = true;
     this.scene_.add(wall4);
 
-       // Create Box3 for each mesh in the scene so that we can
-    // do some easy intersection tests.
-
-    
-
-   
     // Crosshair
     const crosshair = mapLoader.load('resources/crosshair.png');
     crosshair.anisotropy = maxAnisotropy;
@@ -451,38 +460,89 @@ wall1.boundingBox = new THREE.Box3().setFromObject(wall1);
     this.sprite_.scale.set(0.15, 0.15 * this.camera_.aspect, 1);
     this.sprite_.position.set(0, 0, -10);
     this.uiScene_.add(this.sprite_);
-
-    // Call spawnCubes here with the desired count
-    this.spawnCubes(50); // Adjust the count as needed
 }
 
-spawnCubes(count) {
-  const geometry = new THREE.BoxGeometry(4, 4, 4); // Adjust size to 4x4x4 for larger cubes
-  const material = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
-    
-    for (let i = 0; i < count; i++) {
-        const cube = new THREE.Mesh(geometry, material);
-        // Randomly position the cubes within a certain range
-        cube.position.set(
-          (Math.random() - 0.5) * 100, // x position range from -50 to 50
-          Math.random() * 25 + 2,      // y position range from 2 to 52 (above ground level)
-          (Math.random() - 0.5) * 100   // z position range from -50 to 50
-      );
-        this.cubes.push(cube);
-        this.scene_.add(cube); // Add cube to the scene
-          // Create bounding box for the cube
-    cube.geometry.computeBoundingBox();
-    cube.boundingBox = new THREE.Box3().setFromObject(cube); // Save the bounding box
-  
+createGrid(size) {
+  const grid = [];
+  const totalSlots = size * size; // Should be 100 for a 10x10 grid
+
+  const filledSlots = Math.floor(totalSlots * 0.7); // Adjust fill ratio here
+  const filledIndices = new Set();
+
+  while (filledIndices.size < filledSlots) {
+    const index = Math.floor(Math.random() * totalSlots);
+    filledIndices.add(index);
+  }
+
+  for (let x = 0; x < size; x++) {
+    for (let z = 0; z < size; z++) {
+      const index = x * size + z;
+
+      // Only add cubes for filled slots
+      if (filledIndices.has(index)) {
+        const position = new THREE.Vector3(
+          x * this.slotSize - (size / 2 * this.slotSize), // Center the grid
+          START_HEIGHT, // Start at a defined height
+          z * this.slotSize - (size / 2 * this.slotSize)  // Center the grid
+        );
+        grid.push(position);
+      }
     }
+  }
+  return grid;
 }
+createCube(position) {
+  const geometry = new THREE.BoxGeometry(CUBE_SIZE, CUBE_SIZE, CUBE_SIZE);
+  const material = new THREE.MeshStandardMaterial({
+    roughness: 0.5,
+    metalness: 0.5,
+    color: Math.random() * 0xffffff // Random color for the cube
+  });
+
+  const cube = new THREE.Mesh(geometry, material);
+  cube.position.copy(position);
+  this.scene_.add(cube);
+  this.cubes.push(cube);
+
+  // Add a wireframe for debugging
+  const wireframe = new THREE.LineSegments(
+    new THREE.EdgesGeometry(geometry),
+    new THREE.LineBasicMaterial({ color: 0xff0000 })
+  );
+  wireframe.position.copy(position);
+  this.scene_.add(wireframe);
+}
+
+
+createCubes() {
+  this.grid.forEach(position => {
+    this.createCube(position); // Create cube at grid position
+  });
+}
+  spawnCubes(count) {
+    const positions = this.grid.slice(); // Get predefined grid positions
+    for (let i = 0; i < Math.min(count, positions.length); i++) {
+      this.createCube(positions[i]); // Create cube at grid position
+    }
+  }
+
+  handleFallingCubes() {
+    for (const cube of this.cubes) {
+      cube.position.y -= FALL_SPEED; // Move the cube down
+      if (cube.position.y <= 0) {
+        cube.position.y = 0; // Snap to ground level
+      }
+    }
+  }
 
   initializeLights_() {
     const distance = 50.0;
     const angle = Math.PI / 4.0;
     const penumbra = 0.5;
     const decay = 1.0;
-
+    const ambientLight = new THREE.AmbientLight(0x404040, 0.5); // Soft white light
+    this.scene_.add(ambientLight);
+    
     let light = new THREE.SpotLight(
         0xFFFFFF, 100.0, distance, angle, penumbra, decay);
     light.castShadow = true;
@@ -514,20 +574,17 @@ spawnCubes(count) {
     metalMap.wrapS = THREE.RepeatWrapping;
     metalMap.wrapT = THREE.RepeatWrapping;
     metalMap.repeat.set(tiling, tiling);
-
     const albedo = mapLoader.load('resources/freepbr/' + name + 'albedo.png');
     albedo.anisotropy = maxAnisotropy;
     albedo.wrapS = THREE.RepeatWrapping;
     albedo.wrapT = THREE.RepeatWrapping;
     albedo.repeat.set(tiling, tiling);
     albedo.encoding = THREE.sRGBEncoding;
-
     const normalMap = mapLoader.load('resources/freepbr/' + name + 'normal.png');
     normalMap.anisotropy = maxAnisotropy;
     normalMap.wrapS = THREE.RepeatWrapping;
     normalMap.wrapT = THREE.RepeatWrapping;
     normalMap.repeat.set(tiling, tiling);
-
     const roughnessMap = mapLoader.load('resources/freepbr/' + name + 'roughness.png');
     roughnessMap.anisotropy = maxAnisotropy;
     roughnessMap.wrapS = THREE.RepeatWrapping;
@@ -543,10 +600,6 @@ spawnCubes(count) {
 
     return material;
   }
-
-  initializePostFX_() {
-  }
-
   onWindowResize_() {
     this.camera_.aspect = window.innerWidth / window.innerHeight;
     this.camera_.updateProjectionMatrix();
@@ -554,7 +607,6 @@ spawnCubes(count) {
     this.uiCamera_.left = -this.camera_.aspect;
     this.uiCamera_.right = this.camera_.aspect;
     this.uiCamera_.updateProjectionMatrix();
-
     this.threejs_.setSize(window.innerWidth, window.innerHeight);
   }
 
@@ -572,38 +624,9 @@ spawnCubes(count) {
         const timeElapsedS = timeElapsed * 0.001; // Convert milliseconds to seconds
 
         this.inputController.update(); // Update input states
-
         // Start measuring performance
         this.stats.begin(); 
         this.step_(timeElapsedS); // Update the scene with time in seconds
-        const playerBoundingBox = new THREE.Box3(
-          new THREE.Vector3(
-            this.camera_.position.x - 1,
-            this.camera_.position.y - 1,
-            this.camera_.position.z - 1
-          ),
-          new THREE.Vector3(
-            this.camera_.position.x + 1,
-            this.camera_.position.y + 1,
-            this.camera_.position.z + 1
-          )
-        );
-           // Check collisions with cubes
-   // Inside the collision check loop
-// Check collisions with cubes
-for (const cube of this.cubes) {
-  if (playerBoundingBox.intersectsBox(cube.boundingBox)) {
-      console.log('Collision detected with cube!');
-      
-      // Example collision response: Change the cube's color
-      cube.material.color.set(0xff0000); // Change to red
-      
-      // Optionally, move the player back a bit
-  }
-}
-
-
-
         // Clear the scene
         this.threejs_.autoClear = true;
         this.threejs_.render(this.scene_, this.camera_); // Render the main scene
@@ -619,23 +642,16 @@ for (const cube of this.cubes) {
             this.frameCount = 0; // Reset for the next second
             this.lastTime = currentTime; // Update last time
         }
-
         // Call the next frame
         this.raf_();
     });
 }
-
 step_(timeElapsedS) {
     // Use timeElapsedS for updates
     this.fpsCamera_.update(timeElapsedS); // Example usage
     // Other updates that depend on the elapsed time can go here
-}
-
-}
-
-
+}}
 let _APP = null;
-
 window.addEventListener('DOMContentLoaded', () => {
   _APP = new FirstPersonCameraDemo();
 })
