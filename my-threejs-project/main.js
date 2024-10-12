@@ -1,8 +1,6 @@
 import * as THREE from 'https://cdn.skypack.dev/three@0.136.0';
-import { FirstPersonControls } from 'https://cdn.skypack.dev/three@0.136.0/examples/jsm/controls/FirstPersonControls.js';
 import Stats from 'https://cdn.skypack.dev/three@0.136.0/examples/jsm/libs/stats.module.js';
 
-import InputController from './InputController.js'; // Adjust the path as necessary
 
 // FirstPersonCamera.js
 const KEYS = {
@@ -14,6 +12,119 @@ const KEYS = {
 };
 function clamp(x, a, b) {
   return Math.min(Math.max(x, a), b);
+}
+
+const showInstructions = () => {
+  blocker.style.display = 'flex'; // Show instructions
+};
+
+const hideInstructions = () => {
+  blocker.style.display = 'none'; // Hide instructions
+};
+
+
+  // Add click event to request pointer lock
+  document.body.addEventListener('click', () => {
+    document.body.requestPointerLock();
+  });
+class InputController {
+  constructor(target) {
+    this.target_ = target || document.body; // Set default target to body
+    this.isPointerLocked = false; // Track pointer lock state
+    this.initialize_();
+  }
+
+  initialize_() {
+    this.current_ = {
+      leftButton: false,
+      rightButton: false,
+      mouseXDelta: 0,
+      mouseYDelta: 0,
+      mouseX: 0,
+      mouseY: 0,
+    };
+    this.previous_ = null;
+    this.keys_ = {};
+    this.previousKeys_ = {};
+
+    // Add Pointer Lock event listeners
+    document.addEventListener('pointerlockchange', () => this.onPointerLockChange_(), false);
+    document.addEventListener('mousemove', (e) => this.onMouseMove_(e), false);
+    this.target_.addEventListener('mousedown', (e) => this.onMouseDown_(e), false);
+    this.target_.addEventListener('mouseup', (e) => this.onMouseUp_(e), false);
+    this.target_.addEventListener('keydown', (e) => this.onKeyDown_(e), false);
+    this.target_.addEventListener('keyup', (e) => this.onKeyUp_(e), false);
+  }
+
+  requestPointerLock_() {
+    if (!this.isPointerLocked) {
+      if (this.target_.requestPointerLock) {
+        this.target_.requestPointerLock();
+      } else {
+        console.warn("Pointer Lock is not supported in this browser.");
+      }
+    } else {
+      console.log("Pointer Lock is already active.");
+    }
+  }
+
+  onPointerLockChange_() {
+    if (document.pointerLockElement === this.target_) {
+      console.log("Pointer Lock enabled");
+      this.isPointerLocked = true; // Set state to true
+      hideInstructions(); // Call your function to hide instructions
+    } else {
+      console.log("Pointer Lock disabled");
+      this.isPointerLocked = false; // Set state to false
+      showInstructions(); // Call your function to show instructions
+    }
+  }
+
+  onMouseMove_(e) {
+    // Only update if pointer lock is enabled
+    if (this.isPointerLocked) {
+      this.current_.mouseXDelta = e.movementX; // Relative movement
+      this.current_.mouseYDelta = e.movementY;
+      console.log(`Mouse X Delta: ${this.current_.mouseXDelta}, Mouse Y Delta: ${this.current_.mouseYDelta}`);
+    }
+  }
+
+  handleMouseButton_(button, state) {
+    switch (button) {
+      case 0:
+        this.current_.leftButton = state;
+        break;
+      case 2:
+        this.current_.rightButton = state;
+        break;
+    }
+  }
+  
+  onMouseDown_(e) {
+    this.handleMouseButton_(e.button, true);
+  }
+
+  onMouseUp_(e) {
+    this.handleMouseButton_(e.button, false);
+  }
+
+  onKeyDown_(e) {
+    this.keys_[e.keyCode] = true;
+  }
+
+  onKeyUp_(e) {
+    this.keys_[e.keyCode] = false;
+  }
+
+  key(keyCode) {
+    return !!this.keys_[keyCode];
+  }
+
+  update(_) {
+    if (this.previous_ !== null) {
+      this.previous_ = { ...this.current_ };
+    }
+  }
 }
 class FirstPersonCamera {
   constructor(camera, objects) {
@@ -31,6 +142,12 @@ class FirstPersonCamera {
    this.charge = 1;      // Full charge starts at 1
    this.chargeDecreaseRate = 0.1; // Rate to decrease charge when sprinting
 
+   this.cylinders = []; // Populate this with your cylinder mesh objects
+
+   // Raycaster for landing detection
+   this.landingRaycaster = new THREE.Raycaster();
+   this.downDirection = new THREE.Vector3(0, -1, 0); // Downward direction
+   this.raycastDistance = 10; // Distance to check for landing
 
 
     this.headBobActive_ = false;
@@ -72,7 +189,7 @@ class FirstPersonCamera {
     }, undefined, (error) => {
       console.error('An error occurred while loading the audio file:', error);
     });
-    
+   
   }
 
   update(timeElapsedS) {
@@ -111,6 +228,11 @@ class FirstPersonCamera {
     }
 
     this.camera_.lookAt(closest);
+
+      // Raycaster for landing detection
+      this.landingRaycaster = new THREE.Raycaster();
+      this.downDirection = new THREE.Vector3(0, -1, 0); // Downward direction
+      this.raycastDistance = 10; // Distance to check for landing
   }
 
   updateHeadBob_(timeElapsedS) {
@@ -177,7 +299,7 @@ class FirstPersonCamera {
     // Handle jumping
     if (!this.isJumping && this.input_.key(32)) { // Spacebar key for jumping
       this.isJumping = true;
-      const sprintFactor = isSprinting ? 1.2 : 1; // Jump higher if sprinting
+      const sprintFactor = isSprinting ? 1.7 : 1; // Jump higher if sprinting
       this.jumpVelocity = Math.sqrt(2 * -this.gravity * this.jumpHeight) * sprintFactor;
     }
   
@@ -261,42 +383,37 @@ updateRotation_(timeElapsedS) {
 }
 }
 
-// Variables to control the spawning and falling
-const FALL_SPEED = 0.1; // Adjust the fall speed
-const CUBE_SIZE = 2; // Size of each cube
-const START_HEIGHT = 10; // Height from which the cubes start falling
 
+const START_HEIGHT = 10; // Height from which the cubes start falling
+const CYLINDER_SIZE = 2;
+const SPACING = CYLINDER_SIZE * 2.5;  // Adjust the spacing between cylinders (2.5x cylinder size)
 
 class FirstPersonCameraDemo {
   constructor() {
+
+    let fallingSpeed = 0.1; // Define falling speed
+
     this.camera = null; // Ensure this is initialized correctly
     this.controls = null; // Ensure this is initialized correctly
     this.inputController = null; // Declare the input controller
     this.scene = new THREE.Scene(); // Make sure this line exists
-
-    this.cubes = []; // To store cube references
     this.objects_ = [];
     this.slotSize = 3; // Change this if your cube size is different
     this.gridSize = 10; // Desired grid size (10x10)
     this.grid = this.createGrid(this.gridSize);
-
+    this.cylinders = [];
+     // Raycaster for landing detection
+     this.landingRaycaster = new THREE.Raycaster();
+     this.downDirection = new THREE.Vector3(0, -1, 0); // Downward direction
+     this.raycastDistance = 10; // Distance to check for landing
     // Initialize and add cubes
     this.initializeRenderer_(); // Ensure this is called early
-
     this.initialize_();
-    this.createCubes(); // Create the cubes after generating the grid
-
-    this.spawnCubes(50); // Call to spawn cubes
-
-    // Initialize Stats
-
     this.fps = 0;  // Initialize fps variable
     this.frameCount = 0; // Frame count for FPS calculation
     this.lastTime = performance.now(); // Store the last time for FPS calculation
-
     this.initStats();
     this.update(); // Start the update loop
-
     // Start the animation loop
     this.previousRAF_ = null;
     this.raf_();
@@ -306,22 +423,66 @@ class FirstPersonCameraDemo {
   initStats() {
     this.stats = new Stats();
     this.stats.showPanel(0); // 0: fps, 1: ms, 2: memory
-
     this.stats.dom.style.position = 'absolute';
     this.stats.dom.style.top = '10px';
     this.stats.dom.style.left = '10px';
     this.stats.dom.style.opacity = '0.9';
     this.stats.dom.style.zIndex = '10000';
-
     const canvas = this.stats.dom.children[0]; // Access the canvas element directly
     canvas.style.width = '200px';  // Set desired width
     canvas.style.height = '100px'; // Set desired height
-
     document.body.appendChild(this.stats.dom);
   }
+ 
 
+
+  onWindowResize_() {
+    this.camera_.aspect = window.innerWidth / window.innerHeight;
+    this.camera_.updateProjectionMatrix();
+
+    this.uiCamera_.left = -this.camera_.aspect;
+    this.uiCamera_.right = this.camera_.aspect;
+    this.uiCamera_.updateProjectionMatrix();
+    this.threejs_.setSize(window.innerWidth, window.innerHeight);
+  }
+
+  loadMaterial_(name, tiling) {
+    const mapLoader = new THREE.TextureLoader();
+    const maxAnisotropy = this.threejs_.capabilities.getMaxAnisotropy();
+
+    const metalMap = mapLoader.load('resources/freepbr/' + name + 'metallic.png');
+    metalMap.anisotropy = maxAnisotropy;
+    metalMap.wrapS = THREE.RepeatWrapping;
+    metalMap.wrapT = THREE.RepeatWrapping;
+    metalMap.repeat.set(tiling, tiling);
+    const albedo = mapLoader.load('resources/freepbr/' + name + 'albedo.png');
+    albedo.anisotropy = maxAnisotropy;
+    albedo.wrapS = THREE.RepeatWrapping;
+    albedo.wrapT = THREE.RepeatWrapping;
+    albedo.repeat.set(tiling, tiling);
+    albedo.encoding = THREE.sRGBEncoding;
+    const normalMap = mapLoader.load('resources/freepbr/' + name + 'normal.png');
+    normalMap.anisotropy = maxAnisotropy;
+    normalMap.wrapS = THREE.RepeatWrapping;
+    normalMap.wrapT = THREE.RepeatWrapping;
+    normalMap.repeat.set(tiling, tiling);
+    const roughnessMap = mapLoader.load('resources/freepbr/' + name + 'roughness.png');
+    roughnessMap.anisotropy = maxAnisotropy;
+    roughnessMap.wrapS = THREE.RepeatWrapping;
+    roughnessMap.wrapT = THREE.RepeatWrapping;
+    roughnessMap.repeat.set(tiling, tiling);
+
+    const material = new THREE.MeshStandardMaterial({
+      metalnessMap: metalMap,
+      map: albedo,
+      normalMap: normalMap,
+      roughnessMap: roughnessMap,
+    });
+
+    return material;
+  }
   update() {
-    this.handleFallingCubes(); // Handle cube falling logic
+    // this.handleFallingCubes(); 
     this.stats.update(); // Update stats
     requestAnimationFrame(this.update.bind(this)); // Loop the update
   }
@@ -333,23 +494,18 @@ class FirstPersonCameraDemo {
   }
   initializeDemo_() {
     this.fpsCamera_ = new FirstPersonCamera(this.camera_, this.objects_);
-
   }
-
   initializeRenderer_() {
     this.threejs_ = new THREE.WebGLRenderer({
       antialias: false,
     });
-    this.threejs_.shadowMap.enabled = true;
-    this.threejs_.shadowMap.type = THREE.PCFSoftShadowMap;
     this.threejs_.setPixelRatio(window.devicePixelRatio);
     this.threejs_.setSize(window.innerWidth, window.innerHeight);
     this.threejs_.physicallyCorrectLights = true;
     this.threejs_.outputEncoding = THREE.sRGBEncoding;
-  
+    this.threejs_.shadowMap.enabled = true; // Enable shadows
+    this.threejs_.shadowMap.type = THREE.PCFSoftShadowMap; // Optional: Change shadow map type for softer shadows
     document.body.appendChild(this.threejs_.domElement);
-  
-  
   
     window.addEventListener('resize', () => {
       this.onWindowResize_();
@@ -360,16 +516,42 @@ class FirstPersonCameraDemo {
     const near = 1.0;
     const far = 1000.0;
     this.camera_ = new THREE.PerspectiveCamera(fov, aspect, near, far);
-    this.camera_.position.set(0, 2, 0);
-  
+    this.camera_.position.set(0, 10, 10); // Set initial camera position (x, y, z)
     this.scene_ = new THREE.Scene();
-    this.spawnCubes(50); // Adjust the count as needed
-
+    this.spawnCylinders(70);
     this.uiCamera_ = new THREE.OrthographicCamera(
         -1, 1, 1 * aspect, -1 * aspect, 1, 1000);
     this.uiScene_ = new THREE.Scene();
   }
-  
+  initializeLights_() {
+    const distance = 50.0;
+    const angle = Math.PI / 4.0;
+    const penumbra = 0.5;
+    const decay = 1.0;
+    const ambientLight = new THREE.AmbientLight(0x404040, 0.5); // Soft white light
+    this.scene_.add(ambientLight);
+    
+    let light = new THREE.SpotLight(
+        0xFFFFFF, 100.0, distance, angle, penumbra, decay);
+    light.castShadow = true;
+    light.shadow.bias = -0.00001;
+    light.shadow.mapSize.width = 4096;
+    light.shadow.mapSize.height = 4096;
+    light.shadow.camera.near = 1;
+    light.shadow.camera.far = 100;
+
+    light.position.set(25, 25, 0);
+    light.lookAt(0, 0, 0);
+    this.scene_.add(light);
+
+    const upColour = 0xFFFF80;
+    const downColour = 0x808080;
+    light = new THREE.HemisphereLight(upColour, downColour, 0.5);
+    light.color.setHSL( 0.6, 1, 0.6 );
+    light.groundColor.setHSL( 0.095, 1, 0.75 );
+    light.position.set(0, 4, 0);
+    this.scene_.add(light);
+  }
 
   initializeScene_() {
     const loader = new THREE.CubeTextureLoader();
@@ -409,7 +591,7 @@ class FirstPersonCameraDemo {
     box.castShadow = true;
     box.receiveShadow = true;
     this.scene_.add(box);
-
+    
     const concreteMaterial = this.loadMaterial_('concrete3-', 4);
 
     const wall1 = new THREE.Mesh(
@@ -418,9 +600,6 @@ class FirstPersonCameraDemo {
     wall1.position.set(0, -40, -50);
     wall1.castShadow = true;
     wall1.receiveShadow = true;
-// Add bounding box for the wall
-wall1.geometry.computeBoundingBox();
-wall1.boundingBox = new THREE.Box3().setFromObject(wall1);
     this.scene_.add(wall1);
 
     const wall2 = new THREE.Mesh(
@@ -470,149 +649,133 @@ createGrid(size) {
     const index = Math.floor(Math.random() * totalSlots);
     filledIndices.add(index);
   }
+  this.slotSize = CYLINDER_SIZE * 2.5; // Adjust this value based on desired spacing
 
   for (let x = 0; x < size; x++) {
     for (let z = 0; z < size; z++) {
       const index = x * size + z;
-
-      // Only add cubes for filled slots
-      if (filledIndices.has(index)) {
-        const position = new THREE.Vector3(
-          x * this.slotSize - (size / 2 * this.slotSize), // Center the grid
-          START_HEIGHT, // Start at a defined height
-          z * this.slotSize - (size / 2 * this.slotSize)  // Center the grid
-        );
-        grid.push(position);
-      }
+     // Only add positions for filled slots
+     if (filledIndices.has(index)) {
+      const position = new THREE.Vector3(
+        x * this.slotSize - (size / 2 * this.slotSize), // Center the grid
+        START_HEIGHT, // Start at a defined height
+        z * this.slotSize - (size / 2 * this.slotSize)  // Center the grid
+      );
+      grid.push(position);
+    }
     }
   }
   return grid;
 }
-createCube(position) {
-  const geometry = new THREE.BoxGeometry(CUBE_SIZE, CUBE_SIZE, CUBE_SIZE);
-  const material = new THREE.MeshStandardMaterial({
-    roughness: 0.5,
-    metalness: 0.5,
-    color: Math.random() * 0xffffff // Random color for the cube
-  });
 
-  const cube = new THREE.Mesh(geometry, material);
-  cube.position.copy(position);
-  this.scene_.add(cube);
-  this.cubes.push(cube);
+createCylinder(position) {
+  const CYLINDER_DATA = {
+    radiusTop: CYLINDER_SIZE,
+    radiusBottom: CYLINDER_SIZE,
+    height: CYLINDER_SIZE * 2,
+    radialSegments: 6,
+    heightSegments: 1,
+    openEnded: false,
+    thetaStart: 0,
+    thetaLength: 2 * Math.PI
+  };
 
-  // Add a wireframe for debugging
+  // Create geometry using the defined cylinder data
+  const cylinderGeometry = new THREE.CylinderGeometry(
+    CYLINDER_DATA.radiusTop,
+    CYLINDER_DATA.radiusBottom,
+    CYLINDER_DATA.height,
+    CYLINDER_DATA.radialSegments,
+    CYLINDER_DATA.heightSegments,
+    CYLINDER_DATA.openEnded,
+    CYLINDER_DATA.thetaStart,
+    CYLINDER_DATA.thetaLength
+  );
+
+  // Create the cylinder material
+  const cylinderMaterial = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
+
+  // Create the cylinder mesh using geometry and material
+  const cylinderMesh = new THREE.Mesh(cylinderGeometry, cylinderMaterial);
+
+  // Set the cylinder position using the passed-in position
+  cylinderMesh.position.copy(position);
+
+  // Ensure bounding box is computed
+  cylinderMesh.geometry.computeBoundingBox();
+  cylinderMesh.boundingBox = new THREE.Box3().setFromObject(cylinderMesh);
+
+  // Add the cylinder mesh to the scene
+  this.scene_.add(cylinderMesh);
+  this.cylinders.push(cylinderMesh); // Store the cylinder mesh
+
+  // Add a wireframe for debugging (optional)
   const wireframe = new THREE.LineSegments(
-    new THREE.EdgesGeometry(geometry),
+    new THREE.EdgesGeometry(cylinderGeometry),
     new THREE.LineBasicMaterial({ color: 0xff0000 })
   );
   wireframe.position.copy(position);
   this.scene_.add(wireframe);
 }
 
-
-createCubes() {
-  this.grid.forEach(position => {
-    this.createCube(position); // Create cube at grid position
-  });
-}
- spawnCubes(count) {
-    const availablePositions = this.grid.slice(); // Copy of grid positions
-
-    for (let i = 0; i < count; i++) {
+    createCylinders() {
+      this.grid.forEach(position => {
+        this.createCylinder(position); // Create cylinder at grid position
+      });
+    }
+    
+    spawnCylinders(count) {
+      const availablePositions = this.grid.slice(); // Copy of grid positions
+    
+      for (let i = 0; i < count; i++) {
         const randomIndex = Math.floor(Math.random() * availablePositions.length);
         const position = availablePositions[randomIndex];
-
-        this.createCube(position);
+    
+        this.createCylinder(position);
         // Remove the position from the available positions to prevent overlap
         availablePositions.splice(randomIndex, 1);
-    }
-}
-
-
-  handleFallingCubes() {
-    for (const cube of this.cubes) {
-      cube.position.y -= FALL_SPEED; // Move the cube down
-      if (cube.position.y <= 0) {
-        cube.position.y = 0; // Snap to ground level
       }
     }
-  }
+  // Raycaster for landing detection
+  landingRaycaster = new THREE.Raycaster();
+  downDirection = new THREE.Vector3(0, -1, 0); // Downward direction
+  raycastDistance = 10; // Distance to check for landing
 
-  initializeLights_() {
-    const distance = 50.0;
-    const angle = Math.PI / 4.0;
-    const penumbra = 0.5;
-    const decay = 1.0;
-    const ambientLight = new THREE.AmbientLight(0x404040, 0.5); // Soft white light
-    this.scene_.add(ambientLight);
-    
-    let light = new THREE.SpotLight(
-        0xFFFFFF, 100.0, distance, angle, penumbra, decay);
-    light.castShadow = true;
-    light.shadow.bias = -0.00001;
-    light.shadow.mapSize.width = 4096;
-    light.shadow.mapSize.height = 4096;
-    light.shadow.camera.near = 1;
-    light.shadow.camera.far = 100;
+  // Function to check for landing
+  detectLanding() {
+    const cameraPosition = this.camera_.position.clone(); // Get the camera's position
+    this.landingRaycaster.set(cameraPosition, this.downDirection); // Update the raycaster's origin
 
-    light.position.set(25, 25, 0);
-    light.lookAt(0, 0, 0);
-    this.scene_.add(light);
+    const intersects = this.landingRaycaster.intersectObjects(this.cylinders); // Intersect with the cylinders
 
-    const upColour = 0xFFFF80;
-    const downColour = 0x808080;
-    light = new THREE.HemisphereLight(upColour, downColour, 0.5);
-    light.color.setHSL( 0.6, 1, 0.6 );
-    light.groundColor.setHSL( 0.095, 1, 0.75 );
-    light.position.set(0, 4, 0);
-    this.scene_.add(light);
-  }
+    if (intersects.length > 0) {
+        const landingObject = intersects[0].object; // The first intersected cylinder
 
-  loadMaterial_(name, tiling) {
-    const mapLoader = new THREE.TextureLoader();
-    const maxAnisotropy = this.threejs_.capabilities.getMaxAnisotropy();
+        // Check if the camera is above the cylinder and falling
+        if (cameraPosition.y > landingObject.position.y + (landingObject.geometry.parameters.height / 2) &&
+            cameraPosition.y < this.previousCameraY) {
+            if (intersects[0].distance < this.raycastDistance) {
+                console.log('Landed on:', landingObject);
 
-    const metalMap = mapLoader.load('resources/freepbr/' + name + 'metallic.png');
-    metalMap.anisotropy = maxAnisotropy;
-    metalMap.wrapS = THREE.RepeatWrapping;
-    metalMap.wrapT = THREE.RepeatWrapping;
-    metalMap.repeat.set(tiling, tiling);
-    const albedo = mapLoader.load('resources/freepbr/' + name + 'albedo.png');
-    albedo.anisotropy = maxAnisotropy;
-    albedo.wrapS = THREE.RepeatWrapping;
-    albedo.wrapT = THREE.RepeatWrapping;
-    albedo.repeat.set(tiling, tiling);
-    albedo.encoding = THREE.sRGBEncoding;
-    const normalMap = mapLoader.load('resources/freepbr/' + name + 'normal.png');
-    normalMap.anisotropy = maxAnisotropy;
-    normalMap.wrapS = THREE.RepeatWrapping;
-    normalMap.wrapT = THREE.RepeatWrapping;
-    normalMap.repeat.set(tiling, tiling);
-    const roughnessMap = mapLoader.load('resources/freepbr/' + name + 'roughness.png');
-    roughnessMap.anisotropy = maxAnisotropy;
-    roughnessMap.wrapS = THREE.RepeatWrapping;
-    roughnessMap.wrapT = THREE.RepeatWrapping;
-    roughnessMap.repeat.set(tiling, tiling);
+                // Adjust the camera position to sit on top of the cylinder
+                this.camera_.position.y = landingObject.position.y + (landingObject.geometry.parameters.height / 2);
+            }
+        }
+    }
 
-    const material = new THREE.MeshStandardMaterial({
-      metalnessMap: metalMap,
-      map: albedo,
-      normalMap: normalMap,
-      roughnessMap: roughnessMap,
-    });
-
-    return material;
-  }
-  onWindowResize_() {
-    this.camera_.aspect = window.innerWidth / window.innerHeight;
-    this.camera_.updateProjectionMatrix();
-
-    this.uiCamera_.left = -this.camera_.aspect;
-    this.uiCamera_.right = this.camera_.aspect;
-    this.uiCamera_.updateProjectionMatrix();
-    this.threejs_.setSize(window.innerWidth, window.innerHeight);
-  }
+    // Update the previous camera y position for the next frame
+    this.previousCameraY = cameraPosition.y;
+}
+ 
+  isOnCylinder(object) {
+    for (let cylinder of this.cylinders) {
+        const cylinderBox = cylinder.boundingBox;
+        if (cylinderBox.intersectsBox(object.boundingBox)) {
+            return true; // The object is on a cylinder
+        }
+    }
+    return false; // No collisions detected
+}
 
   raf_() {
     requestAnimationFrame((t) => {
@@ -637,6 +800,26 @@ createCubes() {
         this.threejs_.autoClear = false; // Reset autoClear to false for UI rendering
         this.threejs_.render(this.uiScene_, this.uiCamera_); // Render the UI scene
         this.stats.end(); // Stop measuring
+        const playerBoundingBox = new THREE.Box3().setFromCenterAndSize(
+          this.camera_.position,
+          new THREE.Vector3(2, 2, 2) // Adjust the size based on the player's size
+      );
+   
+      let isOnCylinder = false; // Flag to check if player is on a cylinder
+      let landingYPosition = this.camera_.position.y; // Store the landing position
+
+      for (const cylinder of this.cylinders) {
+        const cylinderBox = cylinder.boundingBox;
+  
+        if (playerBoundingBox.intersectsBox(cylinderBox)) {
+          console.log('Collision detected with cylinder!');
+          cylinder.material.color.set(0xffff00); // Change color
+  
+        
+        }
+      }
+  
+      this.detectLanding(); // Call the detectLanding method
 
         // Update FPS and frame count
         this.frameCount++;
