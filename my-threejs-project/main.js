@@ -142,13 +142,6 @@ class FirstPersonCamera {
    this.charge = 1;      // Full charge starts at 1
    this.chargeDecreaseRate = 0.1; // Rate to decrease charge when sprinting
 
-   this.cylinders = []; // Populate this with your cylinder mesh objects
-
-   // Raycaster for landing detection
-   this.landingRaycaster = new THREE.Raycaster();
-   this.downDirection = new THREE.Vector3(0, -1, 0); // Downward direction
-   this.raycastDistance = 10; // Distance to check for landing
-
 
     this.headBobActive_ = false;
     this.headBobTimer_ = 0;
@@ -159,9 +152,6 @@ class FirstPersonCamera {
 
     this.objects_ = objects;
 
-    
-
-
     this.rechargeRate = 0.05; // Rate at which the charge recovers
     this.chargeRecoverDelay = 2; // Delay before charge starts recovering after sprinting
     this.lastSprintedAt = null; // Store the last time the player sprinted
@@ -171,8 +161,14 @@ class FirstPersonCamera {
     this.lastChargeDepletedAt = null; // Timestamp when charge reaches 0
     // Jumping variables
     this.isJumping = false;
+
+    this.previousCameraY = 0; // Initialize this to track previous camera height
+
     this.jumpVelocity = 0; // Vertical speed during jump
     this.gravity = -54; // Gravity constant
+    this.verticalVelocity = 0; // Current vertical speed
+    this.previousCameraY = this.camera_.position.y; 
+
     this.jumpHeight = 8; // Max height of the jump
     this.groundLevel = 2; // Y position of the ground
       // Audio listener setup
@@ -206,7 +202,8 @@ class FirstPersonCamera {
     this.camera_.quaternion.copy(this.rotation_);
     this.camera_.position.copy(this.translation_);
     this.camera_.position.y += Math.sin(this.headBobTimer_ * this.headBobSpeed_) * this.headBobHeight_;
-
+   // Set camera to ground level if landed
+  
 
     const forward = new THREE.Vector3(0, 0, -1);
     forward.applyQuaternion(this.rotation_);
@@ -227,13 +224,13 @@ class FirstPersonCamera {
       }
     }
 
+
+    // Set camera look direction
     this.camera_.lookAt(closest);
 
-      // Raycaster for landing detection
-      this.landingRaycaster = new THREE.Raycaster();
-      this.downDirection = new THREE.Vector3(0, -1, 0); // Downward direction
-      this.raycastDistance = 10; // Distance to check for landing
-  }
+    // Store previous camera Y position for future reference
+    this.previousCameraY = this.camera_.position.y; 
+}
 
   updateHeadBob_(timeElapsedS) {
     if (this.isJumping) {
@@ -301,20 +298,28 @@ class FirstPersonCamera {
       this.isJumping = true;
       const sprintFactor = isSprinting ? 1.7 : 1; // Jump higher if sprinting
       this.jumpVelocity = Math.sqrt(2 * -this.gravity * this.jumpHeight) * sprintFactor;
+      console.log("Jump initiated. Jump velocity:", this.jumpVelocity); // Debug log
+
     }
   
     if (this.isJumping) {
-      this.translation_.y += this.jumpVelocity * timeElapsedS;
-      this.jumpVelocity += this.gravity * timeElapsedS;
-  
-      // Reset jump once on the ground
-      if (this.translation_.y <= this.groundLevel) {
-        this.translation_.y = this.groundLevel; 
-        this.isJumping = false;
-        this.jumpVelocity = 0;
+      if (!this.isGrounded) {
+          this.translation_.y += this.jumpVelocity * timeElapsedS;
+          this.jumpVelocity += this.gravity * timeElapsedS;
       }
-    }
-  
+      if (this.translation_.y <= this.groundLevel) {
+          this.translation_.y = this.groundLevel;
+          this.isJumping = false;
+          this.jumpVelocity = 0;
+
+      }
+  }
+  // Ensure the player does not fall below a certain height
+  if (this.translation_.y < 2) { // Set minimum height threshold
+    this.translation_.y = 10; // Reset the y position to the threshold
+    this.jumpVelocity = 0; // Reset vertical velocity
+}
+
     // Handle movement and head bobbing
     this.isMoving = forwardVelocity || strafeVelocity; // Moving if any velocity
     if (this.isMoving) {
@@ -350,8 +355,10 @@ class FirstPersonCamera {
         this.footstepSound_.stop(); // Stop footstep sound when not moving
       }
     }
+    
+
   }
-  
+
   
   updateChargeUI(charge) {
     const chargeDisplay = document.getElementById('charge-bar');
@@ -391,7 +398,6 @@ const SPACING = CYLINDER_SIZE * 2.5;  // Adjust the spacing between cylinders (2
 class FirstPersonCameraDemo {
   constructor() {
 
-    let fallingSpeed = 0.1; // Define falling speed
 
     this.camera = null; // Ensure this is initialized correctly
     this.controls = null; // Ensure this is initialized correctly
@@ -402,10 +408,7 @@ class FirstPersonCameraDemo {
     this.gridSize = 10; // Desired grid size (10x10)
     this.grid = this.createGrid(this.gridSize);
     this.cylinders = [];
-     // Raycaster for landing detection
-     this.landingRaycaster = new THREE.Raycaster();
-     this.downDirection = new THREE.Vector3(0, -1, 0); // Downward direction
-     this.raycastDistance = 10; // Distance to check for landing
+ 
     // Initialize and add cubes
     this.initializeRenderer_(); // Ensure this is called early
     this.initialize_();
@@ -741,42 +744,37 @@ createCylinder(position) {
   downDirection = new THREE.Vector3(0, -1, 0); // Downward direction
   raycastDistance = 10; // Distance to check for landing
 
-  // Function to check for landing
-  detectLanding() {
-    const cameraPosition = this.camera_.position.clone(); // Get the camera's position
-    this.landingRaycaster.set(cameraPosition, this.downDirection); // Update the raycaster's origin
+// Function to check for landing
+detectLanding() {
+  const cameraPosition = this.camera_.position.clone(); // Get the camera's position
+  this.landingRaycaster.set(cameraPosition, this.downDirection); // Update the raycaster's origin
 
-    const intersects = this.landingRaycaster.intersectObjects(this.cylinders); // Intersect with the cylinders
+  const intersects = this.landingRaycaster.intersectObjects(this.cylinders); // Intersect with the cylinders
+  
+  if (intersects.length > 0) {
+      const landingObject = intersects[0].object; // The first intersected cylinder
+      const cylinderHeight = landingObject.geometry.parameters.height;
+      const cylinderTopY = landingObject.position.y + (cylinderHeight / 2);
 
-    if (intersects.length > 0) {
-        const landingObject = intersects[0].object; // The first intersected cylinder
+      // console.log(`Camera Y: ${cameraPosition.y}, Cylinder Top Y: ${cylinderTopY}`); // Debugging line
 
-        // Check if the camera is above the cylinder and falling
-        if (cameraPosition.y > landingObject.position.y + (landingObject.geometry.parameters.height / 2) &&
-            cameraPosition.y < this.previousCameraY) {
-            if (intersects[0].distance < this.raycastDistance) {
-                console.log('Landed on:', landingObject);
+      // Check if the camera is above the cylinder 
+      if (cameraPosition.y > cylinderTopY && cameraPosition.y < this.previousCameraY) {
+          // Only land if within a certain distance
+          if (intersects[0].distance < this.raycastDistance) {
+              console.log('Landed on:', landingObject);
+      
+          // Stop the vertical movement (reset jump velocity)
+          this.jumpVelocity = 0; // Reset jump velocity
+          this.verticalVelocity = 0; // Also reset vertical velocity
+          this.isJumping = false; // Player is no longer jumping
+          }
+      }
+  }
 
-                // Adjust the camera position to sit on top of the cylinder
-                this.camera_.position.y = landingObject.position.y + (landingObject.geometry.parameters.height / 2);
-            }
-        }
-    }
-
-    // Update the previous camera y position for the next frame
-    this.previousCameraY = cameraPosition.y;
+  // Update the previous camera Y position for the next frame
+  this.previousCameraY = cameraPosition.y;
 }
- 
-  isOnCylinder(object) {
-    for (let cylinder of this.cylinders) {
-        const cylinderBox = cylinder.boundingBox;
-        if (cylinderBox.intersectsBox(object.boundingBox)) {
-            return true; // The object is on a cylinder
-        }
-    }
-    return false; // No collisions detected
-}
-
   raf_() {
     requestAnimationFrame((t) => {
         // Initialize previousRAF_ on the first call
@@ -805,8 +803,6 @@ createCylinder(position) {
           new THREE.Vector3(2, 2, 2) // Adjust the size based on the player's size
       );
    
-      let isOnCylinder = false; // Flag to check if player is on a cylinder
-      let landingYPosition = this.camera_.position.y; // Store the landing position
 
       for (const cylinder of this.cylinders) {
         const cylinderBox = cylinder.boundingBox;
