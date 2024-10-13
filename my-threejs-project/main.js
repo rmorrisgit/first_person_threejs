@@ -1,6 +1,7 @@
 import * as THREE from 'https://cdn.skypack.dev/three@0.136.0';
 import Stats from 'https://cdn.skypack.dev/three@0.136.0/examples/jsm/libs/stats.module.js';
-
+const MOVE_SPEED = 5; // Adjust to your preference
+const ACCELERATION = 0.1;
 
 // FirstPersonCamera.js
 const KEYS = {
@@ -27,10 +28,14 @@ const hideInstructions = () => {
   document.body.addEventListener('click', () => {
     document.body.requestPointerLock();
   });
+
+
 class InputController {
   constructor(target) {
     this.target_ = target || document.body; // Set default target to body
     this.isPointerLocked = false; // Track pointer lock state
+    this.forwardVelocity = 0; // Initialize forward velocity
+    this.strafeVelocity = 0;  // Initialize strafe velocity
     this.initialize_();
   }
 
@@ -160,21 +165,14 @@ class FirstPersonCamera {
     this.lastChargeDepletedAt = null; // Timestamp when charge reaches 0
     // Jumping variables
 
-    this.previousCameraY = 0; // Initialize this to track previous camera height
-    this.prevTime = performance.now();
 
     this.isJumping = false; // State to track if the player is jumping
-    this.raycastDistance = 10; // Distance to check for landing
-    this.landingRaycaster = new THREE.Raycaster();
-    this.downDirection = new THREE.Vector3(0, -1, 0); // Downward direction
-    this.cylinders = objects; // Assuming this is how you are passing the cylinders
 
     this.jumpVelocity = 0; // Vertical speed during jump
     this.velocity = new THREE.Vector3(0, 0, 0); // 3D vector for velocity
 
     this.gravity = -54; // Gravity constant
     this.verticalVelocity = 0; // Current vertical speed
-    this.previousCameraY = this.camera_.position.y; 
 
     this.jumpHeight = 8; // Max height of the jump
     this.groundLevel = 2; // Y position of the ground
@@ -309,11 +307,18 @@ class FirstPersonCamera {
 
       // Check if player has landed
       if (this.translation_.y <= this.groundLevel) {
-        this.translation_.y = this.groundLevel; // Reset position to ground level
-        this.isJumping = false; // Reset jumping state
-        this.jumpVelocity = 0; // Reset jump velocity
+        this.translation_.y = this.groundLevel;  // Reset to ground level
+        this.isJumping = false;  // Player has landed
+        this.jumpVelocity = 0;   // Reset jump velocity
+        console.log("Player has landed.");  // Debug log for landing
+
+        // Play footstep sound if moving upon landing
+        if (this.isMoving && !this.footstepSound_.isPlaying) {
+          this.footstepSound_.play();  // Resume footstep sounds
+        }
       }
     }
+
 
     // Handle movement and head bobbing
     this.isMoving = forwardVelocity || strafeVelocity; // Moving if any velocity
@@ -348,12 +353,21 @@ class FirstPersonCamera {
       }
       this.headBobActive_ = false; // Disable head bobbing when not moving
     }
-
-    // Ensure the camera does not go below ground level
-    if (this.translation_.y < this.groundLevel) {
-      this.translation_.y = this.groundLevel; // Reset position to ground level if below
+    if (!this.isJumping && this.translation_.y <= this.groundLevel && this.input_.key(32)) { // Only jump if grounded
+      this.isJumping = true;
+      const sprintFactor = isSprinting ? 1.7 : 1; // Jump higher if sprinting
+      this.jumpVelocity = Math.sqrt(2 * -this.gravity * this.jumpHeight) * sprintFactor;
+      console.log("Jump initiated. Jump velocity:", this.jumpVelocity); // Debug log
     }
+
+    if (this.isJumping) {
+      this.translation_.y += this.jumpVelocity * timeElapsedS;  // Update Y position based on velocity
+      this.jumpVelocity += this.gravity * timeElapsedS; // Apply gravity to jump velocity
+
+
   }
+  }
+
   updateChargeUI(charge) {
     const chargeDisplay = document.getElementById('charge-bar');
     const chargeText = document.getElementById('charge-text');
@@ -385,10 +399,6 @@ updateRotation_(timeElapsedS) {
 }
 
 
-const START_HEIGHT = 10; // Height from which the cubes start falling
-const CYLINDER_SIZE = 2;
-const SPACING = CYLINDER_SIZE * 2.5;  // Adjust the spacing between cylinders (2.5x cylinder size)
-
 class FirstPersonCameraDemo {
   constructor() {
 
@@ -397,11 +407,6 @@ class FirstPersonCameraDemo {
     this.controls = null; // Ensure this is initialized correctly
     this.inputController = null; // Declare the input controller
     this.scene = new THREE.Scene(); // Make sure this line exists
-    this.objects_ = [];
-    this.slotSize = 3; // Change this if your cube size is different
-    this.gridSize = 10; // Desired grid size (10x10)
-    this.grid = this.createGrid(this.gridSize);
-    this.cylinders = [];
  
     // Initialize and add cubes
     this.initializeRenderer_(); // Ensure this is called early
@@ -441,41 +446,7 @@ class FirstPersonCameraDemo {
     this.threejs_.setSize(window.innerWidth, window.innerHeight);
   }
 
-  loadMaterial_(name, tiling) {
-    const mapLoader = new THREE.TextureLoader();
-    const maxAnisotropy = this.threejs_.capabilities.getMaxAnisotropy();
 
-    const metalMap = mapLoader.load('resources/freepbr/' + name + 'metallic.png');
-    metalMap.anisotropy = maxAnisotropy;
-    metalMap.wrapS = THREE.RepeatWrapping;
-    metalMap.wrapT = THREE.RepeatWrapping;
-    metalMap.repeat.set(tiling, tiling);
-    const albedo = mapLoader.load('resources/freepbr/' + name + 'albedo.png');
-    albedo.anisotropy = maxAnisotropy;
-    albedo.wrapS = THREE.RepeatWrapping;
-    albedo.wrapT = THREE.RepeatWrapping;
-    albedo.repeat.set(tiling, tiling);
-    albedo.encoding = THREE.sRGBEncoding;
-    const normalMap = mapLoader.load('resources/freepbr/' + name + 'normal.png');
-    normalMap.anisotropy = maxAnisotropy;
-    normalMap.wrapS = THREE.RepeatWrapping;
-    normalMap.wrapT = THREE.RepeatWrapping;
-    normalMap.repeat.set(tiling, tiling);
-    const roughnessMap = mapLoader.load('resources/freepbr/' + name + 'roughness.png');
-    roughnessMap.anisotropy = maxAnisotropy;
-    roughnessMap.wrapS = THREE.RepeatWrapping;
-    roughnessMap.wrapT = THREE.RepeatWrapping;
-    roughnessMap.repeat.set(tiling, tiling);
-
-    const material = new THREE.MeshStandardMaterial({
-      metalnessMap: metalMap,
-      map: albedo,
-      normalMap: normalMap,
-      roughnessMap: roughnessMap,
-    });
-
-    return material;
-  }
   update() {
     // this.handleFallingCubes(); 
     this.stats.update(); // Update stats
@@ -513,7 +484,6 @@ class FirstPersonCameraDemo {
     this.camera_ = new THREE.PerspectiveCamera(fov, aspect, near, far);
     this.camera_.position.set(0, 10, 10); // Set initial camera position (x, y, z)
     this.scene_ = new THREE.Scene();
-    this.spawnCylinders(70);
     this.uiCamera_ = new THREE.OrthographicCamera(
         -1, 1, 1 * aspect, -1 * aspect, 1, 1000);
     this.uiScene_ = new THREE.Scene();
@@ -581,46 +551,22 @@ class FirstPersonCameraDemo {
 
     const box = new THREE.Mesh(
       new THREE.BoxGeometry(4, 4, 4),
-      this.loadMaterial_('vintage-tile1_', 0.2));
+      );
     box.position.set(10, 2, 0);
     box.castShadow = true;
     box.receiveShadow = true;
     this.scene_.add(box);
-    
-    const concreteMaterial = this.loadMaterial_('concrete3-', 4);
+  
+    const meshes = [
+      plane, box];
 
-    const wall1 = new THREE.Mesh(
-      new THREE.BoxGeometry(100, 100, 4),
-      concreteMaterial);
-    wall1.position.set(0, -40, -50);
-    wall1.castShadow = true;
-    wall1.receiveShadow = true;
-    this.scene_.add(wall1);
+    this.objects_ = [];
 
-    const wall2 = new THREE.Mesh(
-      new THREE.BoxGeometry(100, 100, 4),
-      concreteMaterial);
-    wall2.position.set(0, -40, 50);
-    wall2.castShadow = true;
-    wall2.receiveShadow = true;
-    this.scene_.add(wall2);
-
-    const wall3 = new THREE.Mesh(
-      new THREE.BoxGeometry(4, 100, 100),
-      concreteMaterial);
-    wall3.position.set(50, -40, 0);
-    wall3.castShadow = true;
-    wall3.receiveShadow = true;
-    this.scene_.add(wall3);
-
-    const wall4 = new THREE.Mesh(
-      new THREE.BoxGeometry(4, 100, 100),
-      concreteMaterial);
-    wall4.position.set(-50, -40, 0);
-    wall4.castShadow = true;
-    wall4.receiveShadow = true;
-    this.scene_.add(wall4);
-
+    for (let i = 0; i < meshes.length; ++i) {
+      const b = new THREE.Box3();
+      b.setFromObject(meshes[i]);
+      this.objects_.push(b);
+    }
     // Crosshair
     const crosshair = mapLoader.load('resources/crosshair.png');
     crosshair.anisotropy = maxAnisotropy;
@@ -633,152 +579,6 @@ class FirstPersonCameraDemo {
     this.uiScene_.add(this.sprite_);
 }
 
-createGrid(size) {
-  const grid = [];
-  const totalSlots = size * size; // Should be 100 for a 10x10 grid
-
-  const filledSlots = Math.floor(totalSlots * 0.7); // Adjust fill ratio here
-  const filledIndices = new Set();
-
-  while (filledIndices.size < filledSlots) {
-    const index = Math.floor(Math.random() * totalSlots);
-    filledIndices.add(index);
-  }
-  this.slotSize = CYLINDER_SIZE * 2.5; // Adjust this value based on desired spacing
-
-  for (let x = 0; x < size; x++) {
-    for (let z = 0; z < size; z++) {
-      const index = x * size + z;
-     // Only add positions for filled slots
-     if (filledIndices.has(index)) {
-      const position = new THREE.Vector3(
-        x * this.slotSize - (size / 2 * this.slotSize), // Center the grid
-        START_HEIGHT, // Start at a defined height
-        z * this.slotSize - (size / 2 * this.slotSize)  // Center the grid
-      );
-      grid.push(position);
-    }
-    }
-  }
-  return grid;
-}
-
-createCylinder(position) {
-
-  const CYLINDER_DATA = {
-    radiusTop: CYLINDER_SIZE,
-    radiusBottom: CYLINDER_SIZE,
-    height: CYLINDER_SIZE * 2,
-    radialSegments: 6,
-    heightSegments: 1,
-    openEnded: false,
-    thetaStart: 0,
-    thetaLength: 2 * Math.PI
-  };
-
-  // Create geometry using the defined cylinder data
-  const cylinderGeometry = new THREE.CylinderGeometry(
-    CYLINDER_DATA.radiusTop,
-    CYLINDER_DATA.radiusBottom,
-    CYLINDER_DATA.height,
-    CYLINDER_DATA.radialSegments,
-    CYLINDER_DATA.heightSegments,
-    CYLINDER_DATA.openEnded,
-    CYLINDER_DATA.thetaStart,
-    CYLINDER_DATA.thetaLength
-  );
-
-  // Create the cylinder material
-  const cylinderMaterial = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
-
-  // Create the cylinder mesh using geometry and material
-  const cylinderMesh = new THREE.Mesh(cylinderGeometry, cylinderMaterial);
-
-  // Set the cylinder position using the passed-in position
-  cylinderMesh.position.copy(position);
-
-  // Ensure bounding box is computed
-  cylinderMesh.geometry.computeBoundingBox();
-  cylinderMesh.boundingBox = new THREE.Box3().setFromObject(cylinderMesh);
-
-  // Add the cylinder mesh to the scene
-  this.scene_.add(cylinderMesh);
-  this.cylinders.push(cylinderMesh); // Store the cylinder mesh
-
-  // Add a wireframe for debugging (optional)
-  const wireframe = new THREE.LineSegments(
-    new THREE.EdgesGeometry(cylinderGeometry),
-    new THREE.LineBasicMaterial({ color: 0xff0000 })
-  );
-  wireframe.position.copy(position);
-  this.scene_.add(wireframe);
-}
-
-    createCylinders() {
-      this.grid.forEach(position => {
-        this.createCylinder(position); // Create cylinder at grid position
-      });
-    }
-    
-    spawnCylinders(count) {
-      const availablePositions = this.grid.slice(); // Copy of grid positions
-    
-      for (let i = 0; i < count; i++) {
-        const randomIndex = Math.floor(Math.random() * availablePositions.length);
-        const position = availablePositions[randomIndex];
-    
-        this.createCylinder(position);
-        // Remove the position from the available positions to prevent overlap
-        availablePositions.splice(randomIndex, 1);
-      }
-    }
-
-    
-  // Raycaster for landing detection
-  landingRaycaster = new THREE.Raycaster();
-  downDirection = new THREE.Vector3(0, -1, 0); // Downward direction
-  raycastDistance = 10; // Distance to check for landing
-
-// Function to check for landing
-detectLanding() {
-  const cameraPosition = this.camera_.position.clone(); // Get the camera's position
-  this.landingRaycaster.set(cameraPosition, this.downDirection); // Update the raycaster's origin
-
-  const intersects = this.landingRaycaster.intersectObjects(this.cylinders); // Intersect with the cylinders
-  					const onObject = intersects.length > 0;
-       
-
-  if (onObject === true) {
-      const landingObject = intersects[0].object; // The first intersected cylinder
-      const cylinderHeight = landingObject.geometry.parameters.height;
-      const cylinderTopY = landingObject.position.y + (cylinderHeight / 2);
-      this.verticalVelocity = 0; // Reset vertical velocity on landing
-
-      // console.log(`Camera Y: ${cameraPosition.y}, Cylinder Top Y: ${cylinderTopY}`); // Debugging line
-
-      // Check if the camera is above the cylinder 
-      if (cameraPosition.y > cylinderTopY && cameraPosition.y < this.previousCameraY) {
-          // Only land if within a certain distance
-          if (intersects[0].distance < this.raycastDistance) {
-            console.log('Landed on:', landingObject);
-            this.camera_.position.y = cylinderTopY + 0.1; // Add a slight offset
-
-            // Reset velocities and jump state
-            this.jumpVelocity = 0;
-            this.verticalVelocity = 0;
-            this.isJumping = false;
-        }
-        
-    }
-  } else {
-    // Apply gravity if not on an object
-    this.verticalVelocity += this.gravity * 0.016; // Assuming 60 FPS (1/60 seconds)
-    this.camera_.position.y += this.verticalVelocity; // Update camera position based on vertical velocity
-}
-
-// Update previous camera Y position for the next frame
-this.previousCameraY = this.camera_.position.y;
-}
 
   raf_() {
     requestAnimationFrame((t) => {
@@ -803,24 +603,7 @@ this.previousCameraY = this.camera_.position.y;
         this.threejs_.autoClear = false; // Reset autoClear to false for UI rendering
         this.threejs_.render(this.uiScene_, this.uiCamera_); // Render the UI scene
         this.stats.end(); // Stop measuring
-        const playerBoundingBox = new THREE.Box3().setFromCenterAndSize(
-          this.camera_.position,
-          new THREE.Vector3(2, 2, 2) // Adjust the size based on the player's size
-      );
-   
-
-      for (const cylinder of this.cylinders) {
-        const cylinderBox = cylinder.boundingBox;
-  
-        if (playerBoundingBox.intersectsBox(cylinderBox)) {
-          console.log('Collision detected with cylinder!');
-          cylinder.material.color.set(0xffff00); // Change color
-  
         
-        }
-      }
-  
-      this.detectLanding(); // Call the detectLanding method
 
         // Update FPS and frame count
         this.frameCount++;
@@ -833,14 +616,6 @@ this.previousCameraY = this.camera_.position.y;
         // Call the next frame
         this.raf_();
     });
-}
-
-jump() {
-  // Ensure the player can jump only if they are on the ground
-  if (!this.isJumping) {
-      this.isJumping = true;
-      this.verticalVelocity = this.jumpHeight; // Set vertical velocity for the jump
-  }
 }
 
 step_(timeElapsedS) {
