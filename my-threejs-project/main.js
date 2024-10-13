@@ -142,7 +142,6 @@ class FirstPersonCamera {
    this.charge = 1;      // Full charge starts at 1
    this.chargeDecreaseRate = 0.1; // Rate to decrease charge when sprinting
 
-
     this.headBobActive_ = false;
     this.headBobTimer_ = 0;
     this.headBobSpeed_ = 15;
@@ -160,11 +159,19 @@ class FirstPersonCamera {
     this.timeoutDuration = 5; // Timeout duration in seconds
     this.lastChargeDepletedAt = null; // Timestamp when charge reaches 0
     // Jumping variables
-    this.isJumping = false;
 
     this.previousCameraY = 0; // Initialize this to track previous camera height
+    this.prevTime = performance.now();
+
+    this.isJumping = false; // State to track if the player is jumping
+    this.raycastDistance = 10; // Distance to check for landing
+    this.landingRaycaster = new THREE.Raycaster();
+    this.downDirection = new THREE.Vector3(0, -1, 0); // Downward direction
+    this.cylinders = objects; // Assuming this is how you are passing the cylinders
 
     this.jumpVelocity = 0; // Vertical speed during jump
+    this.velocity = new THREE.Vector3(0, 0, 0); // 3D vector for velocity
+
     this.gravity = -54; // Gravity constant
     this.verticalVelocity = 0; // Current vertical speed
     this.previousCameraY = this.camera_.position.y; 
@@ -276,90 +283,77 @@ class FirstPersonCamera {
     const currentMoveSpeed = isSprinting ? this.moveSpeed_ * 2 : this.moveSpeed_;
   
   
-    // Manage sprint charge
-    if (isSprinting) {
+     // Manage sprint charge
+     if (isSprinting) {
       this.charge = clamp(this.charge - this.chargeDecreaseRate * timeElapsedS, 0, 1);
       this.updateChargeUI(this.charge);
-    } else {
+  } else {
       // Recover charge when not sprinting
-      this.charge = clamp(this.charge + (this.chargeDecreaseRate * 0.5) * timeElapsedS, 0, 1); // Slower recovery
+      this.charge = clamp(this.charge + (this.rechargeRate * timeElapsedS), 0, 1); // Adjust recovery rate if needed
       this.updateChargeUI(this.charge);
-    }
-  
-    // Check if player can sprint
-    if (this.charge > 0 && this.input_.key(KEYS.shift) && !this.isJumping) {
-      this.isSprinting = true; 
-    } else {
-      this.isSprinting = false;
-    }
-  
-    // Handle jumping
-    if (!this.isJumping && this.input_.key(32)) { // Spacebar key for jumping
+  }
+
+  this.isSprinting = isSprinting; // Track sprinting state
+     // Handle jumping
+     if (!this.isJumping && this.translation_.y <= this.groundLevel && this.input_.key(32)) { // Only jump if grounded
       this.isJumping = true;
       const sprintFactor = isSprinting ? 1.7 : 1; // Jump higher if sprinting
       this.jumpVelocity = Math.sqrt(2 * -this.gravity * this.jumpHeight) * sprintFactor;
       console.log("Jump initiated. Jump velocity:", this.jumpVelocity); // Debug log
-
     }
-  
-    if (this.isJumping) {
-      if (!this.isGrounded) {
-          this.translation_.y += this.jumpVelocity * timeElapsedS;
-          this.jumpVelocity += this.gravity * timeElapsedS;
-      }
-      if (this.translation_.y <= this.groundLevel) {
-          this.translation_.y = this.groundLevel;
-          this.isJumping = false;
-          this.jumpVelocity = 0;
 
+    // Handle jumping logic
+    if (this.isJumping) {
+      this.translation_.y += this.jumpVelocity * timeElapsedS;  // Update Y position based on velocity
+      this.jumpVelocity += this.gravity * timeElapsedS; // Apply gravity to jump velocity
+
+      // Check if player has landed
+      if (this.translation_.y <= this.groundLevel) {
+        this.translation_.y = this.groundLevel; // Reset position to ground level
+        this.isJumping = false; // Reset jumping state
+        this.jumpVelocity = 0; // Reset jump velocity
       }
-  }
-  // Ensure the player does not fall below a certain height
-  if (this.translation_.y < 2) { // Set minimum height threshold
-    this.translation_.y = 10; // Reset the y position to the threshold
-    this.jumpVelocity = 0; // Reset vertical velocity
-}
+    }
 
     // Handle movement and head bobbing
     this.isMoving = forwardVelocity || strafeVelocity; // Moving if any velocity
     if (this.isMoving) {
       this.headBobActive_ = true; // Activate head bobbing when moving
-      
+
+      // Create a quaternion for rotation based on the current phi (yaw)
       const qx = new THREE.Quaternion();
       qx.setFromAxisAngle(new THREE.Vector3(0, 1, 0), this.phi_);
-  
-      // Forward movement
+
+      // Forward movement vector
       const forward = new THREE.Vector3(0, 0, -1);
       forward.applyQuaternion(qx);
-        forward.multiplyScalar(forwardVelocity * timeElapsedS * currentMoveSpeed); // Use currentMoveSpeed
-  
-      // Strafing movement
-      const left = new THREE.Vector3(-1, 0, 0);
-      left.applyQuaternion(qx);
-      left.multiplyScalar(strafeVelocity * timeElapsedS * currentMoveSpeed);
-      
-      // Update translation with movement
-      this.translation_.add(forward).add(left);
-  
-      // Adjust footstep sound volume based on movement speed
-      const speedFactor = Math.max(forwardVelocity, strafeVelocity);
-      this.footstepSound_.setVolume(0.5 * speedFactor);
-      
+      forward.multiplyScalar(forwardVelocity * timeElapsedS * currentMoveSpeed); // Use currentMoveSpeed
+
+      // Strafe movement vector
+      const strafe = new THREE.Vector3(-1, 0, 0);
+      strafe.applyQuaternion(qx);
+      strafe.multiplyScalar(strafeVelocity * timeElapsedS * this.strafeSpeed_);
+
+      // Update camera translation
+      this.translation_.add(forward).add(strafe);
+
+      // Play footstep sound when moving
       if (!this.footstepSound_.isPlaying) {
-        this.footstepSound_.play(); // Play footstep sound if not already playing
+        this.footstepSound_.play();
       }
-  
     } else {
-      this.headBobActive_ = false; // Disable head bobbing when stationary
+      // Stop footstep sound when not moving
       if (this.footstepSound_.isPlaying) {
-        this.footstepSound_.stop(); // Stop footstep sound when not moving
+        this.footstepSound_.stop();
       }
+      this.headBobActive_ = false; // Disable head bobbing when not moving
     }
-    
 
+    // Ensure the camera does not go below ground level
+    if (this.translation_.y < this.groundLevel) {
+      this.translation_.y = this.groundLevel; // Reset position to ground level if below
+    }
   }
-
-  
   updateChargeUI(charge) {
     const chargeDisplay = document.getElementById('charge-bar');
     const chargeText = document.getElementById('charge-text');
@@ -437,8 +431,6 @@ class FirstPersonCameraDemo {
     document.body.appendChild(this.stats.dom);
   }
  
-
-
   onWindowResize_() {
     this.camera_.aspect = window.innerWidth / window.innerHeight;
     this.camera_.updateProjectionMatrix();
@@ -672,6 +664,7 @@ createGrid(size) {
 }
 
 createCylinder(position) {
+
   const CYLINDER_DATA = {
     radiusTop: CYLINDER_SIZE,
     radiusBottom: CYLINDER_SIZE,
@@ -739,6 +732,8 @@ createCylinder(position) {
         availablePositions.splice(randomIndex, 1);
       }
     }
+
+    
   // Raycaster for landing detection
   landingRaycaster = new THREE.Raycaster();
   downDirection = new THREE.Vector3(0, -1, 0); // Downward direction
@@ -750,11 +745,14 @@ detectLanding() {
   this.landingRaycaster.set(cameraPosition, this.downDirection); // Update the raycaster's origin
 
   const intersects = this.landingRaycaster.intersectObjects(this.cylinders); // Intersect with the cylinders
-  
-  if (intersects.length > 0) {
+  					const onObject = intersects.length > 0;
+       
+
+  if (onObject === true) {
       const landingObject = intersects[0].object; // The first intersected cylinder
       const cylinderHeight = landingObject.geometry.parameters.height;
       const cylinderTopY = landingObject.position.y + (cylinderHeight / 2);
+      this.verticalVelocity = 0; // Reset vertical velocity on landing
 
       // console.log(`Camera Y: ${cameraPosition.y}, Cylinder Top Y: ${cylinderTopY}`); // Debugging line
 
@@ -762,19 +760,26 @@ detectLanding() {
       if (cameraPosition.y > cylinderTopY && cameraPosition.y < this.previousCameraY) {
           // Only land if within a certain distance
           if (intersects[0].distance < this.raycastDistance) {
-              console.log('Landed on:', landingObject);
-      
-          // Stop the vertical movement (reset jump velocity)
-          this.jumpVelocity = 0; // Reset jump velocity
-          this.verticalVelocity = 0; // Also reset vertical velocity
-          this.isJumping = false; // Player is no longer jumping
-          }
-      }
-  }
+            console.log('Landed on:', landingObject);
+            this.camera_.position.y = cylinderTopY + 0.1; // Add a slight offset
 
-  // Update the previous camera Y position for the next frame
-  this.previousCameraY = cameraPosition.y;
+            // Reset velocities and jump state
+            this.jumpVelocity = 0;
+            this.verticalVelocity = 0;
+            this.isJumping = false;
+        }
+        
+    }
+  } else {
+    // Apply gravity if not on an object
+    this.verticalVelocity += this.gravity * 0.016; // Assuming 60 FPS (1/60 seconds)
+    this.camera_.position.y += this.verticalVelocity; // Update camera position based on vertical velocity
 }
+
+// Update previous camera Y position for the next frame
+this.previousCameraY = this.camera_.position.y;
+}
+
   raf_() {
     requestAnimationFrame((t) => {
         // Initialize previousRAF_ on the first call
@@ -829,6 +834,15 @@ detectLanding() {
         this.raf_();
     });
 }
+
+jump() {
+  // Ensure the player can jump only if they are on the ground
+  if (!this.isJumping) {
+      this.isJumping = true;
+      this.verticalVelocity = this.jumpHeight; // Set vertical velocity for the jump
+  }
+}
+
 step_(timeElapsedS) {
     // Use timeElapsedS for updates
     this.fpsCamera_.update(timeElapsedS); // Example usage
