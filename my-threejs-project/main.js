@@ -137,6 +137,7 @@ class FirstPersonCamera {
     this.input_ = new InputController();
     this.rotation_ = new THREE.Quaternion();
     this.translation_ = new THREE.Vector3(0, 2, 0);
+
     this.phi_ = 0;
     this.phiSpeed_ = 8;
     this.theta_ = 0;
@@ -153,6 +154,7 @@ class FirstPersonCamera {
     this.headBobHeight_ = 0.01;
     this.walkSpeed_ = 10;
     this.strafeSpeed_ = 10;
+    this.previousTimestamp = performance.now(); // Initialize timestamp for delta time
 
     this.objects_ = objects;
 
@@ -165,14 +167,20 @@ class FirstPersonCamera {
     this.lastChargeDepletedAt = null; // Timestamp when charge reaches 0
     // Jumping variables
 
+    this.previousCameraY = 0; // Initialize this to track previous camera height
 
     this.isJumping = false; // State to track if the player is jumping
+    this.raycastDistance = 10; // Distance to check for landing
+    this.landingRaycaster = new THREE.Raycaster();
+    this.downDirection = new THREE.Vector3(0, -1, 0); // Downward direction
+    this.cylinders = objects; // Assuming this is how you are passing the cylinders
 
     this.jumpVelocity = 0; // Vertical speed during jump
     this.velocity = new THREE.Vector3(0, 0, 0); // 3D vector for velocity
 
     this.gravity = -54; // Gravity constant
     this.verticalVelocity = 0; // Current vertical speed
+    this.previousCameraY = this.camera_.position.y; 
 
     this.jumpHeight = 8; // Max height of the jump
     this.groundLevel = 2; // Y position of the ground
@@ -194,6 +202,7 @@ class FirstPersonCamera {
   }
 
   update(timeElapsedS) {
+    
     // Update other functionalities
     this.updateRotation_(timeElapsedS);
     this.updateCamera_(timeElapsedS);
@@ -353,20 +362,65 @@ class FirstPersonCamera {
       }
       this.headBobActive_ = false; // Disable head bobbing when not moving
     }
-    if (!this.isJumping && this.translation_.y <= this.groundLevel && this.input_.key(32)) { // Only jump if grounded
+    if (!this.isJumping && this.input_.key(32)) { // Only jump if grounded
       this.isJumping = true;
       const sprintFactor = isSprinting ? 1.7 : 1; // Jump higher if sprinting
       this.jumpVelocity = Math.sqrt(2 * -this.gravity * this.jumpHeight) * sprintFactor;
       console.log("Jump initiated. Jump velocity:", this.jumpVelocity); // Debug log
     }
 
-    if (this.isJumping) {
-      this.translation_.y += this.jumpVelocity * timeElapsedS;  // Update Y position based on velocity
-      this.jumpVelocity += this.gravity * timeElapsedS; // Apply gravity to jump velocity
 
 
+ 
   }
-  }
+//   const cameraPosition = this.camera_.position.clone(); // Get the camera's position
+//   this.landingRaycaster.set(cameraPosition, this.downDirection); // Update the raycaster's origin
+
+//   const intersects = this.landingRaycaster.intersectObjects(this.cylinders, true); // Add true for recursive checking
+  
+//   const onObject = intersects.length > 0; // Check if intersected any objects
+
+//   if (onObject) {
+//     const landingObject = intersects[0].object; // The first intersected cylinder
+//     const cylinderHeight = landingObject.geometry.parameters.height;
+//     const cylinderTopY = landingObject.position.y + (cylinderHeight / 2);
+
+//     // Reset vertical velocity on landing
+//     this.verticalVelocity = 0;
+
+//     // Check if the camera is above the cylinder 
+//     if (cameraPosition.y > cylinderTopY && cameraPosition.y < this.previousCameraY) {
+//       if (intersects[0].distance < this.raycastDistance) {
+//         console.log('Landed on:', landingObject);
+//         this.translation_.y = cylinderTopY; // Align with the top of the cylinder
+//         console.log("Collision detected with:", intersects[0].object);
+
+//         // Reset velocities and jump state
+//         this.jumpVelocity = 0;
+//         this.verticalVelocity = 0;
+//         this.isJumping = false;
+
+//         // Handle jumping logic
+//         this.canJump = true; // Allow jumping again
+//       }
+//     }
+//   } else {
+//     // Apply gravity if not on an object
+//     this.verticalVelocity += this.gravity * 0.016; // Assuming 60 FPS (1/60 seconds)
+//     this.camera_.position.y += this.verticalVelocity; // Update camera position based on vertical velocity
+
+//     // Prevent falling below the ground
+//     if (this.camera_.position.y < 10) {
+//       this.verticalVelocity = 0; // Reset vertical velocity
+//       this.camera_.position.y = 10; // Reset to ground level
+//       this.canJump = true; // Allow jumping again
+//     }
+//   }
+
+//   // Update previous camera Y position for the next frame
+//   this.previousCameraY = this.camera_.position.y;
+// }
+
 
   updateChargeUI(charge) {
     const chargeDisplay = document.getElementById('charge-bar');
@@ -399,6 +453,11 @@ updateRotation_(timeElapsedS) {
 }
 
 
+const START_HEIGHT = 10; // Height from which the cubes start falling
+const CYLINDER_SIZE = 2;
+const SPACING = CYLINDER_SIZE * 2.5;  // Adjust the spacing between cylinders (2.5x cylinder size)
+const objects = [];
+
 class FirstPersonCameraDemo {
   constructor() {
 
@@ -407,6 +466,11 @@ class FirstPersonCameraDemo {
     this.controls = null; // Ensure this is initialized correctly
     this.inputController = null; // Declare the input controller
     this.scene = new THREE.Scene(); // Make sure this line exists
+    this.objects_ = [];
+    this.slotSize = 3; // Change this if your cube size is different
+    this.gridSize = 10; // Desired grid size (10x10)
+    this.grid = this.createGrid(this.gridSize);
+    this.cylinders = [];
  
     // Initialize and add cubes
     this.initializeRenderer_(); // Ensure this is called early
@@ -446,7 +510,41 @@ class FirstPersonCameraDemo {
     this.threejs_.setSize(window.innerWidth, window.innerHeight);
   }
 
+  loadMaterial_(name, tiling) {
+    const mapLoader = new THREE.TextureLoader();
+    const maxAnisotropy = this.threejs_.capabilities.getMaxAnisotropy();
 
+    const metalMap = mapLoader.load('resources/freepbr/' + name + 'metallic.png');
+    metalMap.anisotropy = maxAnisotropy;
+    metalMap.wrapS = THREE.RepeatWrapping;
+    metalMap.wrapT = THREE.RepeatWrapping;
+    metalMap.repeat.set(tiling, tiling);
+    const albedo = mapLoader.load('resources/freepbr/' + name + 'albedo.png');
+    albedo.anisotropy = maxAnisotropy;
+    albedo.wrapS = THREE.RepeatWrapping;
+    albedo.wrapT = THREE.RepeatWrapping;
+    albedo.repeat.set(tiling, tiling);
+    albedo.encoding = THREE.sRGBEncoding;
+    const normalMap = mapLoader.load('resources/freepbr/' + name + 'normal.png');
+    normalMap.anisotropy = maxAnisotropy;
+    normalMap.wrapS = THREE.RepeatWrapping;
+    normalMap.wrapT = THREE.RepeatWrapping;
+    normalMap.repeat.set(tiling, tiling);
+    const roughnessMap = mapLoader.load('resources/freepbr/' + name + 'roughness.png');
+    roughnessMap.anisotropy = maxAnisotropy;
+    roughnessMap.wrapS = THREE.RepeatWrapping;
+    roughnessMap.wrapT = THREE.RepeatWrapping;
+    roughnessMap.repeat.set(tiling, tiling);
+
+    const material = new THREE.MeshStandardMaterial({
+      metalnessMap: metalMap,
+      map: albedo,
+      normalMap: normalMap,
+      roughnessMap: roughnessMap,
+    });
+
+    return material;
+  }
   update() {
     // this.handleFallingCubes(); 
     this.stats.update(); // Update stats
@@ -484,6 +582,7 @@ class FirstPersonCameraDemo {
     this.camera_ = new THREE.PerspectiveCamera(fov, aspect, near, far);
     this.camera_.position.set(0, 10, 10); // Set initial camera position (x, y, z)
     this.scene_ = new THREE.Scene();
+    this.spawnCylinders(70);
     this.uiCamera_ = new THREE.OrthographicCamera(
         -1, 1, 1 * aspect, -1 * aspect, 1, 1000);
     this.uiScene_ = new THREE.Scene();
@@ -551,22 +650,46 @@ class FirstPersonCameraDemo {
 
     const box = new THREE.Mesh(
       new THREE.BoxGeometry(4, 4, 4),
-      );
+      this.loadMaterial_('vintage-tile1_', 0.2));
     box.position.set(10, 2, 0);
     box.castShadow = true;
     box.receiveShadow = true;
     this.scene_.add(box);
-  
-    const meshes = [
-      plane, box];
+    
+    const concreteMaterial = this.loadMaterial_('concrete3-', 4);
 
-    this.objects_ = [];
+    const wall1 = new THREE.Mesh(
+      new THREE.BoxGeometry(100, 100, 4),
+      concreteMaterial);
+    wall1.position.set(0, -40, -50);
+    wall1.castShadow = true;
+    wall1.receiveShadow = true;
+    this.scene_.add(wall1);
 
-    for (let i = 0; i < meshes.length; ++i) {
-      const b = new THREE.Box3();
-      b.setFromObject(meshes[i]);
-      this.objects_.push(b);
-    }
+    const wall2 = new THREE.Mesh(
+      new THREE.BoxGeometry(100, 100, 4),
+      concreteMaterial);
+    wall2.position.set(0, -40, 50);
+    wall2.castShadow = true;
+    wall2.receiveShadow = true;
+    this.scene_.add(wall2);
+
+    const wall3 = new THREE.Mesh(
+      new THREE.BoxGeometry(4, 100, 100),
+      concreteMaterial);
+    wall3.position.set(50, -40, 0);
+    wall3.castShadow = true;
+    wall3.receiveShadow = true;
+    this.scene_.add(wall3);
+
+    const wall4 = new THREE.Mesh(
+      new THREE.BoxGeometry(4, 100, 100),
+      concreteMaterial);
+    wall4.position.set(-50, -40, 0);
+    wall4.castShadow = true;
+    wall4.receiveShadow = true;
+    this.scene_.add(wall4);
+
     // Crosshair
     const crosshair = mapLoader.load('resources/crosshair.png');
     crosshair.anisotropy = maxAnisotropy;
@@ -578,6 +701,101 @@ class FirstPersonCameraDemo {
     this.sprite_.position.set(0, 0, -10);
     this.uiScene_.add(this.sprite_);
 }
+
+createGrid(size) {
+  const grid = [];
+  const totalSlots = size * size; // Should be 100 for a 10x10 grid
+
+  const filledSlots = Math.floor(totalSlots * 0.7); // Adjust fill ratio here
+  const filledIndices = new Set();
+
+  while (filledIndices.size < filledSlots) {
+    const index = Math.floor(Math.random() * totalSlots);
+    filledIndices.add(index);
+  }
+  this.slotSize = CYLINDER_SIZE * 2.5; // Adjust this value based on desired spacing
+
+  for (let x = 0; x < size; x++) {
+    for (let z = 0; z < size; z++) {
+      const index = x * size + z;
+     // Only add positions for filled slots
+     if (filledIndices.has(index)) {
+      const position = new THREE.Vector3(
+        x * this.slotSize - (size / 2 * this.slotSize), // Center the grid
+        START_HEIGHT, // Start at a defined height
+        z * this.slotSize - (size / 2 * this.slotSize)  // Center the grid
+      );
+      grid.push(position);
+    }
+    }
+  }
+  return grid;
+}
+
+createCylinder(position) {
+  const CYLINDER_DATA = {
+    radiusTop: CYLINDER_SIZE,
+    radiusBottom: CYLINDER_SIZE,
+    height: CYLINDER_SIZE * 2,
+    radialSegments: 6,
+    heightSegments: 1,
+    openEnded: false,
+    thetaStart: 0,
+    thetaLength: 2 * Math.PI
+  };
+  // Create geometry using the defined cylinder data
+  const cylinderGeometry = new THREE.CylinderGeometry(
+    CYLINDER_DATA.radiusTop,
+    CYLINDER_DATA.radiusBottom,
+    CYLINDER_DATA.height,
+    CYLINDER_DATA.radialSegments,
+    CYLINDER_DATA.heightSegments,
+    CYLINDER_DATA.openEnded,
+    CYLINDER_DATA.thetaStart,
+    CYLINDER_DATA.thetaLength
+  );
+  const cylinderMaterial = new THREE.MeshBasicMaterial({ color: 0x000000 });
+  const cylinderMesh = new THREE.Mesh(cylinderGeometry, cylinderMaterial);
+  cylinderMesh.position.copy(position);
+  cylinderMesh.geometry.computeBoundingBox();
+
+  const boxHelper = new THREE.BoxHelper(cylinderMesh, 0xffff00); // Yellow bounding box for visibility
+  this.scene_.add(boxHelper);
+  cylinderMesh.boundingBox = new THREE.Box3().setFromObject(cylinderMesh);
+
+  const wireframe = new THREE.LineSegments(
+    new THREE.EdgesGeometry(cylinderGeometry),
+    new THREE.LineBasicMaterial({ color: 0xff0000 })
+  );
+  wireframe.position.copy(position);
+
+  this.scene_.add(cylinderMesh);
+
+  this.cylinders.push(cylinderMesh); 
+  this.scene_.add(wireframe);
+  objects.push(cylinderMesh);
+
+}
+
+  createCylinders() {
+    this.grid.forEach(position => {
+      this.createCylinder(position); // Create cylinder at grid position
+      
+    });
+  }
+  
+  spawnCylinders(count) {
+    const availablePositions = this.grid.slice(); // Copy of grid positions
+  
+    for (let i = 0; i < count; i++) {
+      const randomIndex = Math.floor(Math.random() * availablePositions.length);
+      const position = availablePositions[randomIndex];
+  
+      this.createCylinder(position);
+      // Remove the position from the available positions to prevent overlap
+      availablePositions.splice(randomIndex, 1);
+    }
+  }
 
 
   raf_() {
@@ -603,7 +821,23 @@ class FirstPersonCameraDemo {
         this.threejs_.autoClear = false; // Reset autoClear to false for UI rendering
         this.threejs_.render(this.uiScene_, this.uiCamera_); // Render the UI scene
         this.stats.end(); // Stop measuring
+        const playerBoundingBox = new THREE.Box3().setFromCenterAndSize(
+          this.camera_.position,
+          new THREE.Vector3(2, 2, 2) // Adjust the size based on the player's size
+      );
+   
+
+      for (const cylinder of this.cylinders) {
+        const cylinderBox = cylinder.boundingBox;
+  
+        if (playerBoundingBox.intersectsBox(cylinderBox)) {
+          console.log('Collision detected with cylinder!');
+          cylinder.material.color.set(0xffff00); // Change color
+  
         
+        }
+      }
+  
 
         // Update FPS and frame count
         this.frameCount++;
@@ -616,6 +850,14 @@ class FirstPersonCameraDemo {
         // Call the next frame
         this.raf_();
     });
+}
+
+jump() {
+  // Ensure the player can jump only if they are on the ground
+  if (!this.isJumping) {
+      this.isJumping = true;
+      this.verticalVelocity = this.jumpHeight; // Set vertical velocity for the jump
+  }
 }
 
 step_(timeElapsedS) {
