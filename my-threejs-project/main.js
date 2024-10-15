@@ -170,15 +170,12 @@ class FirstPersonCamera {
 
 
     this.isJumping = false; // State to track if the player is jumping
-    this.raycastDistance = 10; // Distance to check for landing
-
 
     this.jumpVelocity = 0; // Vertical speed during jump
     this.velocity = new THREE.Vector3(0, 0, 0); // 3D vector for velocity
 
     this.gravity = -54; // Gravity constant
     this.verticalVelocity = 0; // Current vertical speed
-    this.previousCameraY = this.camera_.position.y; 
 
     this.jumpHeight = 8; // Max height of the jump
     this.groundLevel = 2; // Y position of the ground
@@ -240,17 +237,16 @@ class FirstPersonCamera {
     // Set camera look direction
     this.camera_.lookAt(closest);
 
-    // Store previous camera Y position for future reference
-    this.previousCameraY = this.camera_.position.y; 
+
 }
 
   updateHeadBob_(timeElapsedS) {
     if (this.isJumping) {
       // Do not apply head bobbing when jumping
       this.headBobTimer_ = 0; // Optionally reset timer while jumping
-      if (this.footstepSound_.isPlaying) {
-          this.footstepSound_.stop(); // Stop sound if jumping
-      }
+      // if (this.footstepSound_.isPlaying) {
+      //     this.footstepSound_.stop(); // Stop sound if jumping
+      // }
       return; // Exit the method to avoid head bobbing
   }
     if (this.headBobActive_) {
@@ -290,32 +286,32 @@ class FirstPersonCamera {
      if (isSprinting) {
       this.charge = clamp(this.charge - this.chargeDecreaseRate * timeElapsedS, 0, 1);
       this.updateChargeUI(this.charge);
-  } else {
-      // Recover charge when not sprinting
-      this.charge = clamp(this.charge + (this.rechargeRate * timeElapsedS), 0, 1); // Adjust recovery rate if needed
-      this.updateChargeUI(this.charge);
-  }
+    } else {
+        // Recover charge when not sprinting
+        this.charge = clamp(this.charge + (this.rechargeRate * timeElapsedS), 0, 1); // Adjust recovery rate if needed
+        this.updateChargeUI(this.charge);
+    }
 
-  this.isSprinting = isSprinting; // Track sprinting state
+    this.isSprinting = isSprinting; // Track sprinting state
 
     // Handle jumping logic
     if (this.isJumping) {
-      this.translation_.y += this.jumpVelocity * timeElapsedS;  // Update Y position based on velocity
-      this.jumpVelocity += this.gravity * timeElapsedS; // Apply gravity to jump velocity
-      // Check if player has landed
-      if (this.translation_.y <= this.groundLevel) {
-        this.isJumping = false;  // Player has landed
-        this.jumpVelocity = 0;   // Reset jump velocity
-        console.log("Player has landed.");  // Debug log for landing
-      }
+    this.translation_.y += this.jumpVelocity * timeElapsedS;  // Update Y position based on velocity
+    this.jumpVelocity += this.gravity * timeElapsedS; // Apply gravity to jump velocity
+    // Check if player has landed
+    if (this.translation_.y <= this.groundLevel) {
+      this.isJumping = false;  // Player has landed
+      this.jumpVelocity = 0;   // Reset jump velocity
+      console.log("Player has landed.");  // Debug log for landing
     }
-     // Handle jumping
-     if (!this.isJumping && this.translation_.y <= this.groundLevel && this.input_.key(32)) { // Only jump if grounded
-      this.isJumping = true;
-      const sprintFactor = isSprinting ? 1.7 : 1; // Jump higher if sprinting
-      this.jumpVelocity = Math.sqrt(2 * -this.gravity * this.jumpHeight) * sprintFactor;
-      console.log("Jump initiated. Jump velocity:", this.jumpVelocity); // Debug log
-    }
+  }
+    // Handle jumping
+    if (!this.isJumping && this.translation_.y <= this.groundLevel && this.input_.key(32)) { // Only jump if grounded
+    this.isJumping = true;
+    const sprintFactor = isSprinting ? 1.7 : 1; // Jump higher if sprinting
+    this.jumpVelocity = Math.sqrt(2 * -this.gravity * this.jumpHeight) * sprintFactor;
+    console.log("Jump initiated. Jump velocity:", this.jumpVelocity); // Debug log
+  }
 
   
     // Handle movement and head bobbing
@@ -351,10 +347,7 @@ class FirstPersonCamera {
     //   }
     //   this.headBobActive_ = false; // Disable head bobbing when not moving
     }
-
-  
   }
-
 
   updateChargeUI(charge) {
     const chargeDisplay = document.getElementById('charge-bar');
@@ -422,7 +415,7 @@ class FirstPersonCameraDemo {
   }
   initializeRenderer_() {
     this.threejs_ = new THREE.WebGLRenderer({
-      antialias: false,
+      antialias: true,
     });
     this.threejs_.setPixelRatio(window.devicePixelRatio);
     this.threejs_.setSize(window.innerWidth, window.innerHeight);
