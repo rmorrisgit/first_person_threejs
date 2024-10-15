@@ -87,7 +87,7 @@ class InputController {
 
   onMouseMove_(e) {
   // Ignore mouse movement when not locked
-  
+  //comment
     // Calculate centered mouse position
     this.current_.mouseX = e.pageX - window.innerWidth / 2;
     this.current_.mouseY = e.pageY - window.innerHeight / 2;
