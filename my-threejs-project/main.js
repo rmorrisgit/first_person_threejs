@@ -156,7 +156,6 @@ class FirstPersonCamera {
     this.headBobHeight_ = 0.01;
     this.walkSpeed_ = 10;
     this.strafeSpeed_ = 10;
-    this.previousTimestamp = performance.now(); // Initialize timestamp for delta time
 
     this.objects_ = objects;
 
@@ -172,9 +171,7 @@ class FirstPersonCamera {
 
     this.isJumping = false; // State to track if the player is jumping
     this.raycastDistance = 10; // Distance to check for landing
-    this.landingRaycaster = new THREE.Raycaster(); // Initialize the raycaster here
-    this.downDirection = new THREE.Vector3(0, -1, 0); // Downward direction
-    this.cylinders = objects; // Assuming this is how you are passing the cylinders
+
 
     this.jumpVelocity = 0; // Vertical speed during jump
     this.velocity = new THREE.Vector3(0, 0, 0); // 3D vector for velocity
@@ -186,19 +183,19 @@ class FirstPersonCamera {
     this.jumpHeight = 8; // Max height of the jump
     this.groundLevel = 2; // Y position of the ground
       // Audio listener setup
-    const listener = new THREE.AudioListener();
-    camera.add(listener);
-    this.footstepSound_ = new THREE.Audio(listener);
-    const audioLoader = new THREE.AudioLoader();
+    // const listener = new THREE.AudioListener();
+    // camera.add(listener);
+    // this.footstepSound_ = new THREE.Audio(listener);
+    // const audioLoader = new THREE.AudioLoader();
 
-    // Load the footstep audio
-    audioLoader.load('./sounds/footstep.ogg', (buffer) => {
-      this.footstepSound_.setBuffer(buffer);
-      this.footstepSound_.setLoop(false); // Prevent looping
-      this.footstepSound_.setVolume(0.5);
-    }, undefined, (error) => {
-      console.error('An error occurred while loading the audio file:', error);
-    });
+    // // Load the footstep audio
+    // audioLoader.load('./sounds/footstep.ogg', (buffer) => {
+    //   this.footstepSound_.setBuffer(buffer);
+    //   this.footstepSound_.setLoop(false); // Prevent looping
+    //   this.footstepSound_.setVolume(0.5);
+    // }, undefined, (error) => {
+    //   console.error('An error occurred while loading the audio file:', error);
+    // });
    
   }
 
@@ -263,20 +260,20 @@ class FirstPersonCamera {
       this.headBobTimer_ = Math.min(this.headBobTimer_ + timeElapsedS, nextStepTime);
 
       // Ensure head bobbing only stops at the end of a full step
-      if (this.headBobTimer_ === nextStepTime) {
-        this.headBobActive_ = false;
+    //   if (this.headBobTimer_ === nextStepTime) {
+    //     this.headBobActive_ = false;
         
-        // Stop footstep sound at the end of the step
-        if (this.footstepSound_.isPlaying) {
-          this.footstepSound_.stop();
-        }
-      }
-    } else if (!this.isMoving) {
-      // Ensure head bobbing and sound stop immediately when not moving
-      this.headBobTimer_ = 0; // Reset the timer if not moving
-      if (this.footstepSound_.isPlaying) {
-        this.footstepSound_.stop(); // Stop sound immediately
-      }
+    //     // Stop footstep sound at the end of the step
+    //     if (this.footstepSound_.isPlaying) {
+    //       this.footstepSound_.stop();
+    //     }
+    //   }
+    // } else if (!this.isMoving) {
+    //   // Ensure head bobbing and sound stop immediately when not moving
+    //   this.headBobTimer_ = 0; // Reset the timer if not moving
+    //   if (this.footstepSound_.isPlaying) {
+    //     this.footstepSound_.stop(); // Stop sound immediately
+    //   }
     }
   }
 
@@ -343,21 +340,20 @@ class FirstPersonCamera {
       // Update camera translation
       this.translation_.add(forward).add(strafe);
 
-      // Play footstep sound when moving
-      if (!this.footstepSound_.isPlaying) {
-        this.footstepSound_.play();
-      }
-    } else {
-      // Stop footstep sound when not moving
-      if (this.footstepSound_.isPlaying) {
-        this.footstepSound_.stop();
-      }
-      this.headBobActive_ = false; // Disable head bobbing when not moving
+    //   // Play footstep sound when moving
+    //   if (!this.footstepSound_.isPlaying) {
+    //     this.footstepSound_.play();
+    //   }
+    // } else {
+    //   // Stop footstep sound when not moving
+    //   if (this.footstepSound_.isPlaying) {
+    //     this.footstepSound_.stop();
+    //   }
+    //   this.headBobActive_ = false; // Disable head bobbing when not moving
     }
 
   
   }
-
 
 
   updateChargeUI(charge) {
@@ -390,12 +386,9 @@ updateRotation_(timeElapsedS) {
 }
 }
 
-
-
 class FirstPersonCameraDemo {
   constructor() {
 
-    this.landingRaycaster = new THREE.Raycaster();
 
     this.camera = null; // Ensure this is initialized correctly
     this.controls = null; // Ensure this is initialized correctly
@@ -414,6 +407,53 @@ class FirstPersonCameraDemo {
     this.previousRAF_ = null;
     this.raf_();
     this.onWindowResize_();
+  }
+  initialize_() {
+    this.initializeLights_();
+    this.initializeScene_();
+    this.initializeDemo_();
+
+
+
+    this.inputController = new InputController(document.body);
+  }
+  initializeDemo_() {
+    this.fpsCamera_ = new FirstPersonCamera(this.camera_, this.objects_);
+  }
+  initializeRenderer_() {
+    this.threejs_ = new THREE.WebGLRenderer({
+      antialias: false,
+    });
+    this.threejs_.setPixelRatio(window.devicePixelRatio);
+    this.threejs_.setSize(window.innerWidth, window.innerHeight);
+    this.threejs_.physicallyCorrectLights = true;
+    this.threejs_.outputEncoding = THREE.sRGBEncoding;
+    this.threejs_.shadowMap.enabled = true; // Enable shadows
+    this.threejs_.shadowMap.type = THREE.PCFSoftShadowMap; // Optional: Change shadow map type for softer shadows
+    document.body.appendChild(this.threejs_.domElement);
+  
+    window.addEventListener('resize', () => {
+      this.onWindowResize_();
+    }, false);
+  
+    const fov = 60;
+    const aspect = 1920 / 1080;
+    const near = 1.0;
+    const far = 1000.0;
+    this.camera_ = new THREE.PerspectiveCamera(fov, aspect, near, far);
+    this.camera_.position.set(0, 10, 10); // Set initial camera position (x, y, z)
+    this.scene_ = new THREE.Scene();
+    this.uiCamera_ = new THREE.OrthographicCamera(
+        -1, 1, 1 * aspect, -1 * aspect, 1, 1000);
+    this.uiScene_ = new THREE.Scene();
+      // Initialize PointerLockControls
+  this.controls = new PointerLockControls( this.camera_, document.body );
+  this.scene_.add(this.controls.getObject()); // Add the controls object to the scene
+
+  // Add event listener to lock the pointer when the user clicks
+  document.body.addEventListener('click', () => {
+    this.controls.lock();
+  });
   }
   // Initialize FPS stats
   initStats() {
@@ -480,53 +520,7 @@ class FirstPersonCameraDemo {
     this.stats.update(); // Update stats
     requestAnimationFrame(this.update.bind(this)); // Loop the update
   }
-  initialize_() {
-    this.initializeLights_();
-    this.initializeScene_();
-    this.initializeDemo_();
-
-
-
-    this.inputController = new InputController(document.body);
-  }
-  initializeDemo_() {
-    this.fpsCamera_ = new FirstPersonCamera(this.camera_, this.objects_);
-  }
-  initializeRenderer_() {
-    this.threejs_ = new THREE.WebGLRenderer({
-      antialias: false,
-    });
-    this.threejs_.setPixelRatio(window.devicePixelRatio);
-    this.threejs_.setSize(window.innerWidth, window.innerHeight);
-    this.threejs_.physicallyCorrectLights = true;
-    this.threejs_.outputEncoding = THREE.sRGBEncoding;
-    this.threejs_.shadowMap.enabled = true; // Enable shadows
-    this.threejs_.shadowMap.type = THREE.PCFSoftShadowMap; // Optional: Change shadow map type for softer shadows
-    document.body.appendChild(this.threejs_.domElement);
-  
-    window.addEventListener('resize', () => {
-      this.onWindowResize_();
-    }, false);
-  
-    const fov = 60;
-    const aspect = 1920 / 1080;
-    const near = 1.0;
-    const far = 1000.0;
-    this.camera_ = new THREE.PerspectiveCamera(fov, aspect, near, far);
-    this.camera_.position.set(0, 10, 10); // Set initial camera position (x, y, z)
-    this.scene_ = new THREE.Scene();
-    this.uiCamera_ = new THREE.OrthographicCamera(
-        -1, 1, 1 * aspect, -1 * aspect, 1, 1000);
-    this.uiScene_ = new THREE.Scene();
-      // Initialize PointerLockControls
-  this.controls = new PointerLockControls( this.camera_, document.body );
-  this.scene_.add(this.controls.getObject()); // Add the controls object to the scene
-
-  // Add event listener to lock the pointer when the user clicks
-  document.body.addEventListener('click', () => {
-    this.controls.lock();
-  });
-  }
+ 
   initializeLights_() {
     const distance = 50.0;
     const angle = Math.PI / 4.0;
@@ -642,9 +636,6 @@ class FirstPersonCameraDemo {
     this.uiScene_.add(this.sprite_);
 }
 
-
-
-  
   
   raf_() {
     requestAnimationFrame((t) => {
@@ -652,9 +643,11 @@ class FirstPersonCameraDemo {
         if (this.previousRAF_ === null) {
             this.previousRAF_ = t;
         }
+
         const timeElapsed = t - this.previousRAF_; // Time since last frame in milliseconds
         this.previousRAF_ = t; // Update previousRAF_ for the next frame
 
+        // Convert to seconds for better accuracy
         const timeElapsedS = timeElapsed * 0.001; // Convert milliseconds to seconds
 
         this.inputController.update(); // Update input states
@@ -667,16 +660,39 @@ class FirstPersonCameraDemo {
         this.threejs_.autoClear = false; // Reset autoClear to false for UI rendering
         this.threejs_.render(this.uiScene_, this.uiCamera_); // Render the UI scene
         this.stats.end(); // Stop measuring
- 
+        const playerBoundingBox = new THREE.Box3().setFromCenterAndSize(
+          this.camera_.position,
+          new THREE.Vector3(2, 2, 2) // Adjust the size based on the player's size
+      );
+   
 
+
+
+        // Update FPS and frame count
+        this.frameCount++;
+        const currentTime = performance.now();
+        if (currentTime - this.lastTime >= 1000) { // Update FPS once per second
+            this.fps = this.frameCount; // Save the frame count for this second
+            this.frameCount = 0; // Reset for the next second
+            this.lastTime = currentTime; // Update last time
+        }
         // Call the next frame
         this.raf_();
     });
 }
 
+jump() {
+  // Ensure the player can jump only if they are on the ground
+  if (!this.isJumping) {
+      this.isJumping = true;
+      this.verticalVelocity = this.jumpHeight; // Set vertical velocity for the jump
+  }
+}
 
 step_(timeElapsedS) {
+    // Use timeElapsedS for updates
     this.fpsCamera_.update(timeElapsedS); // Example usage
+    // Other updates that depend on the elapsed time can go here
 }}
 let _APP = null;
 window.addEventListener('DOMContentLoaded', () => {
