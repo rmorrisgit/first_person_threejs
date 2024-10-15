@@ -1,6 +1,6 @@
 import * as THREE from 'https://cdn.skypack.dev/three@0.136.0';
 import Stats from 'https://cdn.skypack.dev/three@0.136.0/examples/jsm/libs/stats.module.js';
-import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js';
+import {FirstPersonControls} from 'https://cdn.skypack.dev/three@0.136/examples/jsm/controls/FirstPersonControls.js';
 
 const MOVE_SPEED = 5; // Adjust to your preference
 const ACCELERATION = 0.1;
@@ -25,7 +25,6 @@ const hideInstructions = () => {
   blocker.style.display = 'none'; // Hide instructions
 };
 
-
   // Add click event to request pointer lock
   document.body.addEventListener('click', () => {
     document.body.requestPointerLock();
@@ -35,9 +34,6 @@ const hideInstructions = () => {
 class InputController {
   constructor(target) {
     this.target_ = target || document.body; // Set default target to body
-    this.isPointerLocked = false; // Track pointer lock state
-    this.forwardVelocity = 0; // Initialize forward velocity
-    this.strafeVelocity = 0;  // Initialize strafe velocity
     this.initialize_();
   }
 
@@ -53,26 +49,12 @@ class InputController {
     this.previous_ = null;
     this.keys_ = {};
     this.previousKeys_ = {};
-
     // Add Pointer Lock event listeners
     document.addEventListener('pointerlockchange', () => this.onPointerLockChange_(), false);
     document.addEventListener('mousemove', (e) => this.onMouseMove_(e), false);
-    this.target_.addEventListener('mousedown', (e) => this.onMouseDown_(e), false);
-    this.target_.addEventListener('mouseup', (e) => this.onMouseUp_(e), false);
-    this.target_.addEventListener('keydown', (e) => this.onKeyDown_(e), false);
-    this.target_.addEventListener('keyup', (e) => this.onKeyUp_(e), false);
-  }
-
-  requestPointerLock_() {
-    if (!this.isPointerLocked) {
-      if (this.target_.requestPointerLock) {
-        this.target_.requestPointerLock();
-      } else {
-        console.warn("Pointer Lock is not supported in this browser.");
-      }
-    } else {
-      console.log("Pointer Lock is already active.");
-    }
+    document.addEventListener('mouseup', (e) => this.onMouseUp_(e), false);
+    document.addEventListener('keydown', (e) => this.onKeyDown_(e), false);
+    document.addEventListener('keyup', (e) => this.onKeyUp_(e), false);
   }
 
   onPointerLockChange_() {
@@ -80,45 +62,75 @@ class InputController {
       console.log("Pointer Lock enabled");
       this.isPointerLocked = true; // Set state to true
       hideInstructions(); // Call your function to hide instructions
+      // Add mouse move listener only when pointer is locked
+      document.addEventListener('mousemove', (e) => this.onMouseMove_(e), false);
     } else {
       console.log("Pointer Lock disabled");
       this.isPointerLocked = false; // Set state to false
       showInstructions(); // Call your function to show instructions
-    }
-  }
+      // Remove mouse move listener when pointer is not locked
+      document.removeEventListener('mousemove', (e) => this.onMouseMove_(e), false);
+    }}
 
-  onMouseMove_(e) {
-    // Only update if pointer lock is enabled
-    if (this.isPointerLocked) {
-      this.current_.mouseXDelta = e.movementX; // Relative movement
-      this.current_.mouseYDelta = e.movementY;
-      console.log(`Mouse X Delta: ${this.current_.mouseXDelta}, Mouse Y Delta: ${this.current_.mouseYDelta}`);
+    onMouseMove_(e) {
+      if (!this.isPointerLocked) return; // Ignore mouse movement when not locked
+    
+      // Calculate centered mouse position
+      this.current_.mouseX = e.pageX - window.innerWidth / 2;
+      this.current_.mouseY = e.pageY - window.innerHeight / 2;
+    
+      // Initialize previous if it's the first move
+      if (this.previous_ === null) {
+        this.previous_ = { mouseX: this.current_.mouseX, mouseY: this.current_.mouseY };
+      }
+    
+      // Use movement deltas directly for rotation
+      this.current_.mouseXDelta = e.movementX; // Change in X position
+      this.current_.mouseYDelta = e.movementY; // Change in Y position
+    
+      // Update previous mouse position for next move
+      this.previous_.mouseX = this.current_.mouseX;
+      this.previous_.mouseY = this.current_.mouseY;
     }
-  }
-
-  handleMouseButton_(button, state) {
-    switch (button) {
-      case 0:
-        this.current_.leftButton = state;
-        break;
-      case 2:
-        this.current_.rightButton = state;
-        break;
-    }
-  }
+    
   
+
   onMouseDown_(e) {
-    this.handleMouseButton_(e.button, true);
+    this.onMouseMove_(e);
+
+    switch (e.button) {
+      case 0: {
+        this.current_.leftButton = true;
+        break;
+      }
+      case 2: {
+        this.current_.rightButton = true;
+        break;
+      }
+    }
   }
 
   onMouseUp_(e) {
-    this.handleMouseButton_(e.button, false);
+    this.onMouseMove_(e);
+
+    switch (e.button) {
+      case 0: {
+        this.current_.leftButton = false;
+        break;
+      }
+      case 2: {
+        this.current_.rightButton = false;
+        break;
+      }
+    }
   }
 
   onKeyDown_(e) {
     this.keys_[e.keyCode] = true;
+    if (e.keyCode === KEYS.shift) {
+      console.log("Shift key pressed");
+    }
   }
-
   onKeyUp_(e) {
     this.keys_[e.keyCode] = false;
   }
@@ -127,58 +139,64 @@ class InputController {
     return !!this.keys_[keyCode];
   }
 
+  isReady() {
+    return this.previous_ !== null;
+  }
+
   update(_) {
     if (this.previous_ !== null) {
-      this.previous_ = { ...this.current_ };
+      this.current_.mouseXDelta = this.current_.mouseX - this.previous_.mouseX;
+      this.current_.mouseYDelta = this.current_.mouseY - this.previous_.mouseY;
+
+      this.previous_ = {...this.current_};
     }
   }
-}
+};
+
 class FirstPersonCamera {
   constructor(camera, objects) {
-    this.camera_ = camera;
-    this.input_ = new InputController();
-    this.rotation_ = new THREE.Quaternion();
-    this.translation_ = new THREE.Vector3(0, 2, 0);
+  this.camera_ = camera;
+  this.input_ = new InputController();
+  this.rotation_ = new THREE.Quaternion();
+  this.translation_ = new THREE.Vector3(0, 2, 0);
 
-    this.phi_ = 0;
-    this.phiSpeed_ = 8;
-    this.theta_ = 0;
-    this.thetaSpeed_ = 5;
-   // Add these new properties for speeds and charge
-   this.moveSpeed_ = 20; // Adjust this value for movement speed
-   this.lookSpeed_ = 5;  // Adjust this value for look speed
-   this.charge = 1;      // Full charge starts at 1
-   this.chargeDecreaseRate = 0.1; // Rate to decrease charge when sprinting
+  this.phi_ = 0;
+  this.phiSpeed_ = 8;
+  this.theta_ = 0;
+  this.thetaSpeed_ = 5;
+  // Add these new properties for speeds and charge
+  this.moveSpeed_ = 12; // Adjust this value for movement speed
+  this.lookSpeed_ = 5;  // Adjust this value for look speed
 
-    this.headBobActive_ = false;
-    this.headBobTimer_ = 0;
-    this.headBobSpeed_ = 15;
-    this.headBobHeight_ = 0.01;
-    this.walkSpeed_ = 10;
-    this.strafeSpeed_ = 10;
+  this.charge = 1;      // Full charge starts at 1
+  this.chargeDecreaseRate = 0.1; // Rate to decrease charge when sprinting
+  this.headBobActive_ = false;
+  this.headBobTimer_ = 0;
+  this.headBobSpeed_ = 15;
+  this.headBobHeight_ = 0.01;
+ 
 
-    this.objects_ = objects;
+  this.objects_ = objects;
 
-    this.rechargeRate = 0.05; // Rate at which the charge recovers
-    this.chargeRecoverDelay = 2; // Delay before charge starts recovering after sprinting
-    this.lastSprintedAt = null; // Store the last time the player sprinted
-    this.isSprinting = false; // State for sprinting
-    this.sprintTimeout = false; // Sprint timeout state
-    this.timeoutDuration = 5; // Timeout duration in seconds
-    this.lastChargeDepletedAt = null; // Timestamp when charge reaches 0
+  this.rechargeRate = 0.05; // Rate at which the charge recovers
+  this.chargeRecoverDelay = 2; // Delay before charge starts recovering after sprinting
+  this.lastSprintedAt = null; // Store the last time the player sprinted
+  this.isSprinting = false; // State for sprinting
+  this.sprintTimeout = false; // Sprint timeout state
+  this.timeoutDuration = 5; // Timeout duration in seconds
+  this.lastChargeDepletedAt = null; // Timestamp when charge reaches 0
     // Jumping variables
 
+  this.isJumping = false; // State to track if the player is jumping
 
-    this.isJumping = false; // State to track if the player is jumping
+  this.jumpVelocity = 0; // Vertical speed during jump
+  this.velocity = new THREE.Vector3(0, 0, 0); // 3D vector for velocity
 
-    this.jumpVelocity = 0; // Vertical speed during jump
-    this.velocity = new THREE.Vector3(0, 0, 0); // 3D vector for velocity
+  this.gravity = -54; // Gravity constant
+  this.verticalVelocity = 0; // Current vertical speed
 
-    this.gravity = -54; // Gravity constant
-    this.verticalVelocity = 0; // Current vertical speed
-
-    this.jumpHeight = 8; // Max height of the jump
-    this.groundLevel = 2; // Y position of the ground
+  this.jumpHeight = 8; // Max height of the jump
+  this.groundLevel = 2; // Y position of the ground
       // Audio listener setup
     // const listener = new THREE.AudioListener();
     // camera.add(listener);
@@ -276,65 +294,68 @@ class FirstPersonCamera {
   updateTranslation_(timeElapsedS) {
     const forwardVelocity = (this.input_.key(KEYS.w) ? 1 : 0) + (this.input_.key(KEYS.s) ? -1 : 0);
     const strafeVelocity = (this.input_.key(KEYS.a) ? 1 : 0) + (this.input_.key(KEYS.d) ? -1 : 0);
+
     // Check if the player can sprint
     const canSprint = this.charge > 0 && this.input_.key(KEYS.shift) && !this.isJumping;
-    const isSprinting = canSprint; 
+    const isSprinting = canSprint;
+
     // Adjust current movement speed based on sprinting
     const currentMoveSpeed = isSprinting ? this.moveSpeed_ * 2 : this.moveSpeed_;
   
-     // Manage sprint charge
-     if (isSprinting) {
-      this.charge = clamp(this.charge - this.chargeDecreaseRate * timeElapsedS, 0, 1);
-      this.updateChargeUI(this.charge);
+    // Manage sprint charge
+    if (isSprinting) {
+        this.charge = clamp(this.charge - this.chargeDecreaseRate * timeElapsedS, 0, 1);
+        this.updateChargeUI(this.charge);
     } else {
         // Recover charge when not sprinting
-        this.charge = clamp(this.charge + (this.rechargeRate * timeElapsedS), 0, 1); // Adjust recovery rate if needed
+        this.charge = clamp(this.charge + (this.rechargeRate * timeElapsedS), 0, 1);
         this.updateChargeUI(this.charge);
     }
 
     this.isSprinting = isSprinting; // Track sprinting state
-
     // Handle jumping logic
     if (this.isJumping) {
-    this.translation_.y += this.jumpVelocity * timeElapsedS;  // Update Y position based on velocity
-    this.jumpVelocity += this.gravity * timeElapsedS; // Apply gravity to jump velocity
-    // Check if player has landed
-    if (this.translation_.y <= this.groundLevel) {
-      this.isJumping = false;  // Player has landed
-      this.jumpVelocity = 0;   // Reset jump velocity
-      console.log("Player has landed.");  // Debug log for landing
-    }
-  }
-    // Handle jumping
-    if (!this.isJumping && this.translation_.y <= this.groundLevel && this.input_.key(32)) { // Only jump if grounded
-    this.isJumping = true;
-    const sprintFactor = isSprinting ? 1.7 : 1; // Jump higher if sprinting
-    this.jumpVelocity = Math.sqrt(2 * -this.gravity * this.jumpHeight) * sprintFactor;
-    console.log("Jump initiated. Jump velocity:", this.jumpVelocity); // Debug log
+      this.translation_.y += this.jumpVelocity * timeElapsedS;  // Update Y position based on velocity
+      this.jumpVelocity += this.gravity * timeElapsedS; // Apply gravity to jump velocity
+
+      // Check if player has landed
+      if (this.translation_.y <= this.groundLevel) {
+          this.isJumping = false;  // Player has landed
+          this.jumpVelocity = 0;   // Reset jump velocity
+          console.log("Player has landed.");  // Debug log for landing
+      }
   }
 
-  
+    // Handle jumping
+    if (!this.isJumping && this.translation_.y <= this.groundLevel && this.input_.key(32)) {
+        // Only jump if grounded
+        this.isJumping = true;
+        const sprintFactor = isSprinting ? 1.7 : 1; // Jump higher if sprinting
+        this.jumpVelocity = Math.sqrt(2 * -this.gravity * this.jumpHeight) * sprintFactor;
+        console.log("Jump initiated. Jump velocity:", this.jumpVelocity); // Debug log
+    }
+
     // Handle movement and head bobbing
     this.isMoving = forwardVelocity || strafeVelocity; // Moving if any velocity
     if (this.isMoving) {
-      this.headBobActive_ = true; // Activate head bobbing when moving
+        this.headBobActive_ = true; // Activate head bobbing when moving
 
-      // Create a quaternion for rotation based on the current phi (yaw)
-      const qx = new THREE.Quaternion();
-      qx.setFromAxisAngle(new THREE.Vector3(0, 1, 0), this.phi_);
+        // Create a quaternion for rotation based on the current phi (yaw)
+        const rotationQuaternion = new THREE.Quaternion();
+        rotationQuaternion.setFromAxisAngle(new THREE.Vector3(0, 1, 0), this.phi_);
 
-      // Forward movement vector
-      const forward = new THREE.Vector3(0, 0, -1);
-      forward.applyQuaternion(qx);
-      forward.multiplyScalar(forwardVelocity * timeElapsedS * currentMoveSpeed); // Use currentMoveSpeed
+        // Forward movement
+        const forward = new THREE.Vector3(0, 0, -1);
+        forward.applyQuaternion(rotationQuaternion);
+        forward.multiplyScalar(forwardVelocity * timeElapsedS * currentMoveSpeed); // Use currentMoveSpeed here
 
-      // Strafe movement vector
-      const strafe = new THREE.Vector3(-1, 0, 0);
-      strafe.applyQuaternion(qx);
-      strafe.multiplyScalar(strafeVelocity * timeElapsedS * this.strafeSpeed_);
+        // Strafe movement
+        const left = new THREE.Vector3(-1, 0, 0);
+        left.applyQuaternion(rotationQuaternion);
+        left.multiplyScalar(strafeVelocity * timeElapsedS * currentMoveSpeed); // Use currentMoveSpeed here
 
-      // Update camera translation
-      this.translation_.add(forward).add(strafe);
+        // Update camera translation
+        this.translation_.add(forward).add(left);
 
     //   // Play footstep sound when moving
     //   if (!this.footstepSound_.isPlaying) {
@@ -368,10 +389,10 @@ updateRotation_(timeElapsedS) {
   this.phi_ += -xh * this.lookSpeed_;  // Use lookSpeed_ here
   this.theta_ = clamp(this.theta_ + -yh * this.lookSpeed_, -Math.PI / 3, Math.PI / 3);
 
-  const qx = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), this.phi_);
+  const rotationQuaternion = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), this.phi_);
   const qz = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), this.theta_);
 
-  this.rotation_.copy(qx.multiply(qz));
+  this.rotation_.copy(rotationQuaternion.multiply(qz));
 
   // Reset mouse deltas after applying the rotation
   this.input_.current_.mouseXDelta = 0;
@@ -440,13 +461,7 @@ class FirstPersonCameraDemo {
         -1, 1, 1 * aspect, -1 * aspect, 1, 1000);
     this.uiScene_ = new THREE.Scene();
       // Initialize PointerLockControls
-  this.controls = new PointerLockControls( this.camera_, document.body );
-  this.scene_.add(this.controls.getObject()); // Add the controls object to the scene
 
-  // Add event listener to lock the pointer when the user clicks
-  document.body.addEventListener('click', () => {
-    this.controls.lock();
-  });
   }
   // Initialize FPS stats
   initStats() {
@@ -674,13 +689,7 @@ class FirstPersonCameraDemo {
     });
 }
 
-jump() {
-  // Ensure the player can jump only if they are on the ground
-  if (!this.isJumping) {
-      this.isJumping = true;
-      this.verticalVelocity = this.jumpHeight; // Set vertical velocity for the jump
-  }
-}
+
 
 step_(timeElapsedS) {
     // Use timeElapsedS for updates
