@@ -7,6 +7,8 @@ const KEYS = {
   's': 83,
   'w': 87,
   'd': 68,
+  'shift': 16  // Add this line to define the Shift key
+
 };
 
 function clamp(x, a, b) {
@@ -180,8 +182,8 @@ class FirstPersonCamera {
     this.chargeDecreaseRate = 0.1; 
     this.headBobActive_ = false;
     this.headBobTimer_ = 0;
-    this.headBobSpeed_ = 15;
-    this.headBobHeight_ = 2;
+    this.headBobSpeed_ = 10;
+    this.headBobHeight_ = .1;
     this.objects_ = objects;
     this.rechargeRate = 0.05; // Rate at which the charge recovers
   this.chargeRecoverDelay = 2; // Delay before charge starts recovering after sprinting
@@ -270,7 +272,7 @@ class FirstPersonCamera {
 
       if (this.headBobTimer_ == nextStepTime) {
         this.headBobActive_ = false;
-      }     // Stop footstep sound at the end of the step
+      }    
       //     if (this.footstepSound_.isPlaying) {
       //       this.footstepSound_.stop();
       //     }
@@ -412,10 +414,7 @@ class FirstPersonCameraDemo {
   }
 
   initializeDemo_() {
-    // this.controls_ = new FirstPersonControls(
-    //     this.camera_, this.threejs_.domElement);
-    // this.controls_.lookSpeed = 0.8;
-    // this.controls_.movementSpeed = 5;
+   
 
     this.fpsCamera_ = new FirstPersonCamera(this.camera_, this.objects_);
   }
