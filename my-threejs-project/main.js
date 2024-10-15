@@ -357,53 +357,7 @@ class FirstPersonCamera {
 
   
   }
-//   const cameraPosition = this.camera_.position.clone(); // Get the camera's position
-//   this.landingRaycaster.set(cameraPosition, this.downDirection); // Update the raycaster's origin
 
-//   const intersects = this.landingRaycaster.intersectObjects(this.cylinders, true); // Add true for recursive checking
-  
-//   const onObject = intersects.length > 0; // Check if intersected any objects
-
-//   if (onObject) {
-//     const landingObject = intersects[0].object; // The first intersected cylinder
-//     const cylinderHeight = landingObject.geometry.parameters.height;
-//     const cylinderTopY = landingObject.position.y + (cylinderHeight / 2);
-
-//     // Reset vertical velocity on landing
-//     this.verticalVelocity = 0;
-
-//     // Check if the camera is above the cylinder 
-//     if (cameraPosition.y > cylinderTopY && cameraPosition.y < this.previousCameraY) {
-//       if (intersects[0].distance < this.raycastDistance) {
-//         console.log('Landed on:', landingObject);
-//         this.translation_.y = cylinderTopY; // Align with the top of the cylinder
-//         console.log("Collision detected with:", intersects[0].object);
-
-//         // Reset velocities and jump state
-//         this.jumpVelocity = 0;
-//         this.verticalVelocity = 0;
-//         this.isJumping = false;
-
-//         // Handle jumping logic
-//         this.canJump = true; // Allow jumping again
-//       }
-//     }
-//   } else {
-//     // Apply gravity if not on an object
-//     this.verticalVelocity += this.gravity * 0.016; // Assuming 60 FPS (1/60 seconds)
-//     this.camera_.position.y += this.verticalVelocity; // Update camera position based on vertical velocity
-
-//     // Prevent falling below the ground
-//     if (this.camera_.position.y < 10) {
-//       this.verticalVelocity = 0; // Reset vertical velocity
-//       this.camera_.position.y = 10; // Reset to ground level
-//       this.canJump = true; // Allow jumping again
-//     }
-//   }
-
-//   // Update previous camera Y position for the next frame
-//   this.previousCameraY = this.camera_.position.y;
-// }
 
 
   updateChargeUI(charge) {
@@ -437,10 +391,6 @@ updateRotation_(timeElapsedS) {
 }
 
 
-const START_HEIGHT = 10; // Height from which the cubes start falling
-const CYLINDER_SIZE = 2;
-const SPACING = CYLINDER_SIZE * 2.5;  // Adjust the spacing between cylinders (2.5x cylinder size)
-const objects = [];
 
 class FirstPersonCameraDemo {
   constructor() {
@@ -452,10 +402,6 @@ class FirstPersonCameraDemo {
     this.inputController = null; // Declare the input controller
     this.scene = new THREE.Scene(); // Make sure this line exists
     this.objects_ = [];
-    this.slotSize = 3; // Change this if your cube size is different
-    this.gridSize = 10; // Desired grid size (10x10)
-    this.grid = this.createGrid(this.gridSize);
-    this.cylinders = [];
     // Initialize and add cubes
     this.initializeRenderer_(); // Ensure this is called early
     this.initialize_();
@@ -569,7 +515,6 @@ class FirstPersonCameraDemo {
     this.camera_ = new THREE.PerspectiveCamera(fov, aspect, near, far);
     this.camera_.position.set(0, 10, 10); // Set initial camera position (x, y, z)
     this.scene_ = new THREE.Scene();
-    this.spawnCylinders(70);
     this.uiCamera_ = new THREE.OrthographicCamera(
         -1, 1, 1 * aspect, -1 * aspect, 1, 1000);
     this.uiScene_ = new THREE.Scene();
@@ -697,161 +642,8 @@ class FirstPersonCameraDemo {
     this.uiScene_.add(this.sprite_);
 }
 
-createGrid(size) {
-  const grid = [];
-  const totalSlots = size * size; // Should be 100 for a 10x10 grid
 
-  const filledSlots = Math.floor(totalSlots * 0.7); // Adjust fill ratio here
-  const filledIndices = new Set();
 
-  while (filledIndices.size < filledSlots) {
-    const index = Math.floor(Math.random() * totalSlots);
-    filledIndices.add(index);
-  }
-  this.slotSize = CYLINDER_SIZE * 2.5; // Adjust this value based on desired spacing
-
-  for (let x = 0; x < size; x++) {
-    for (let z = 0; z < size; z++) {
-      const index = x * size + z;
-     // Only add positions for filled slots
-     if (filledIndices.has(index)) {
-      const position = new THREE.Vector3(
-        x * this.slotSize - (size / 2 * this.slotSize), // Center the grid
-        START_HEIGHT, // Start at a defined height
-        z * this.slotSize - (size / 2 * this.slotSize)  // Center the grid
-      );
-      grid.push(position);
-    }
-    }
-  }
-  return grid;
-}
-
-createCylinder(position) {
-  const CYLINDER_DATA = {
-    radiusTop: CYLINDER_SIZE,
-    radiusBottom: CYLINDER_SIZE,
-    height: CYLINDER_SIZE * 2,
-    radialSegments: 6,
-    heightSegments: 1,
-    openEnded: false,
-    thetaStart: 0,
-    thetaLength: 2 * Math.PI
-  };
-  // Create geometry using the defined cylinder data
-  const cylinderGeometry = new THREE.CylinderGeometry(
-    CYLINDER_DATA.radiusTop,
-    CYLINDER_DATA.radiusBottom,
-    CYLINDER_DATA.height,
-    CYLINDER_DATA.radialSegments,
-    CYLINDER_DATA.heightSegments,
-    CYLINDER_DATA.openEnded,
-    CYLINDER_DATA.thetaStart,
-    CYLINDER_DATA.thetaLength
-  );
-  const cylinderMaterial = new THREE.MeshBasicMaterial({ color: 0x000000 });
-  const cylinderMesh = new THREE.Mesh(cylinderGeometry, cylinderMaterial);
-  cylinderMesh.position.copy(position);
-  cylinderMesh.geometry.computeBoundingBox();
-
-  const boxHelper = new THREE.BoxHelper(cylinderMesh, 0xffff00); // Yellow bounding box for visibility
-  this.scene_.add(boxHelper);
-  cylinderMesh.boundingBox = new THREE.Box3().setFromObject(cylinderMesh);
-
-  const wireframe = new THREE.LineSegments(
-    new THREE.EdgesGeometry(cylinderGeometry),
-    new THREE.LineBasicMaterial({ color: 0xff0000 })
-  );
-  wireframe.position.copy(position);
-
-  this.scene_.add(cylinderMesh);
-
-  this.cylinders.push(cylinderMesh); 
-  this.scene_.add(wireframe);
-  objects.push(cylinderMesh);
-
-}
-
-  createCylinders() {
-    this.grid.forEach(position => {
-      this.createCylinder(position); // Create cylinder at grid position
-      
-    });
-  }
-  
-  spawnCylinders(count) {
-    const availablePositions = this.grid.slice(); // Copy of grid positions
-  
-    for (let i = 0; i < count; i++) {
-      const randomIndex = Math.floor(Math.random() * availablePositions.length);
-      const position = availablePositions[randomIndex];
-  
-      this.createCylinder(position);
-      // Remove the position from the available positions to prevent overlap
-      availablePositions.splice(randomIndex, 1);
-    }
-  }
-
-  detectLanding() {
-    let isOnObject = false;
-  
-    // Use controls.getObject() to get the player object (instead of the camera)
-    const playerPosition = this.controls.object.position;
-  
-    // Set the ray's origin to the player's current position
-    this.landingRaycaster.ray.origin.copy(playerPosition);
-  
-    // Offset the ray downwards a little bit from the player's feet
-    this.landingRaycaster.ray.origin.y -= 0.1;  // Small offset below the player's feet
-    
-    // Set the ray's direction to point downwards (Y-axis)
-    this.landingRaycaster.ray.direction.set(0, -1, 0); // Point the ray downwards
-  
-    // Check for intersections with all the cylinders in the scene
-    const intersects = this.landingRaycaster.intersectObjects(this.cylinders, false);
-  
-    if (intersects.length > 0) {
-      const intersect = intersects[0]; // Get the closest intersection (the first one)
-  
-      // Get the cylinder that was hit
-      const landingObject = intersect.object;
-      
-      // Calculate the top of the cylinder
-      const cylinderHeight = landingObject.geometry.parameters.height;
-      const cylinderTopY = landingObject.position.y + (cylinderHeight / 2);
-  
-      // Check if the player is close enough to the top of the cylinder to land
-      if (playerPosition.y > cylinderTopY - 1 && playerPosition.y < cylinderTopY + 0.5) {
-        console.log('Landed on:', landingObject);
-        
-        // Align the player with the top of the cylinder
-        playerPosition.y = cylinderTopY;
-        
-        // Reset velocities and jump state
-        this.verticalVelocity = 0;
-        this.jumpVelocity = 0;
-        this.isJumping = false;
-        this.canJump = true;
-        isOnObject = true;
-      }
-    }
-  
-    // Apply gravity if the player isn't standing on any object
-    if (!isOnObject) {
-      this.verticalVelocity += this.gravity * 0.016; // Apply gravity over time
-      playerPosition.y += this.verticalVelocity; // Update player's Y position
-  
-      // Prevent falling below a certain ground level
-      if (playerPosition.y < 100) {
-        this.verticalVelocity = 0;
-        playerPosition.y = 100; // Set to the minimum Y value
-        this.canJump = true; // Allow jumping again
-      }
-    }
-  
-    // Update the previous Y position for the next frame
-    this.previousY = playerPosition.y;
-  }
   
   
   raf_() {
@@ -860,11 +652,9 @@ createCylinder(position) {
         if (this.previousRAF_ === null) {
             this.previousRAF_ = t;
         }
-
         const timeElapsed = t - this.previousRAF_; // Time since last frame in milliseconds
         this.previousRAF_ = t; // Update previousRAF_ for the next frame
 
-        // Convert to seconds for better accuracy
         const timeElapsedS = timeElapsed * 0.001; // Convert milliseconds to seconds
 
         this.inputController.update(); // Update input states
@@ -877,50 +667,16 @@ createCylinder(position) {
         this.threejs_.autoClear = false; // Reset autoClear to false for UI rendering
         this.threejs_.render(this.uiScene_, this.uiCamera_); // Render the UI scene
         this.stats.end(); // Stop measuring
-        const playerBoundingBox = new THREE.Box3().setFromCenterAndSize(
-          this.camera_.position,
-          new THREE.Vector3(2, 2, 2) // Adjust the size based on the player's size
-      );
-   
+ 
 
-      for (const cylinder of this.cylinders) {
-        const cylinderBox = cylinder.boundingBox;
-  
-        if (playerBoundingBox.intersectsBox(cylinderBox)) {
-          console.log('Collision detected with cylinder!');
-          cylinder.material.color.set(0xffff00); // Change color
-  
-        
-        }
-      }
-  
-      this.detectLanding(); // Call the detectLanding method
-
-        // Update FPS and frame count
-        this.frameCount++;
-        const currentTime = performance.now();
-        if (currentTime - this.lastTime >= 1000) { // Update FPS once per second
-            this.fps = this.frameCount; // Save the frame count for this second
-            this.frameCount = 0; // Reset for the next second
-            this.lastTime = currentTime; // Update last time
-        }
         // Call the next frame
         this.raf_();
     });
 }
 
-jump() {
-  // Ensure the player can jump only if they are on the ground
-  if (!this.isJumping) {
-      this.isJumping = true;
-      this.verticalVelocity = this.jumpHeight; // Set vertical velocity for the jump
-  }
-}
 
 step_(timeElapsedS) {
-    // Use timeElapsedS for updates
     this.fpsCamera_.update(timeElapsedS); // Example usage
-    // Other updates that depend on the elapsed time can go here
 }}
 let _APP = null;
 window.addEventListener('DOMContentLoaded', () => {
