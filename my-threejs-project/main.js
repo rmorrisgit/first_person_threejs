@@ -177,7 +177,7 @@ class FirstPersonCamera {
     this.camera_ = camera;
     this.input_ = new InputController();
     this.rotation_ = new THREE.Quaternion();
-    this.baseHeight = 2.5; // Set the base height here (adjustable)
+    this.baseHeight = 2; // Set the base height here (adjustable)
     this.translation_ = new THREE.Vector3(0, this.baseHeight, 0);
     this.phi_ = 0;
     this.phiSpeed_ = 8;
@@ -190,8 +190,8 @@ class FirstPersonCamera {
     this.chargeDecreaseRate = 0.1; 
     this.headBobActive_ = false;
     this.headBobTimer_ = 0;
-    this.headBobSpeed_ = 10;
-    this.headBobHeight_ = .15;
+    this.headBobSpeed_ = 12;
+    this.headBobHeight_ = .13;
     this.rechargeRate = 0.05; // Rate at which the charge recovers
   this.chargeRecoverDelay = 2; // Delay before charge starts recovering after sprinting
   this.lastSprintedAt = null; // Store the last time the player sprinted
@@ -206,10 +206,10 @@ class FirstPersonCamera {
   this.jumpVelocity = 0; // Vertical speed during jump
   this.velocity = new THREE.Vector3(0, 0, 0); // 3D vector for velocity
 
-  this.gravity = -54; // Gravity constant
+  this.gravity = -64; // Gravity constant
   this.verticalVelocity = 0; // Current vertical speed
 
-  this.jumpHeight = 8; // Max height of the jump
+  this.jumpHeight = 6; // Max height of the jump
   this.groundLevel = this.baseHeight; // Set the ground level to the base height
   this.objects_ = objects;
   this.sceneObjects = sceneObjects || [];     // Audio listener setup
@@ -356,7 +356,7 @@ class FirstPersonCamera {
 
  // Adjust current movement speed based on sprinting
  const currentMoveSpeed = isSprinting ? this.moveSpeed_ * 2 : this.moveSpeed_;
- const strafeSpeed = isSprinting ? this.moveSpeed_ * 1.2 : currentMoveSpeed;  
+ const strafeSpeed = isSprinting ? currentMoveSpeed * 0.8 : currentMoveSpeed * 0.8;  // Strafe speed for both cases
  // Manage sprint charge
  if (isSprinting) {
      this.charge = clamp(this.charge - this.chargeDecreaseRate * timeElapsedS, 0, 1);
