@@ -36,11 +36,12 @@ document.body.addEventListener('click', () => {
 
 
 class InputController {
-  constructor(target) {
+  constructor(target) { 
 
     this.target_ = target || document;
-    this.initialize_();    
+    this.initialize_();
   }
+
 
   initialize_() {
     this.current_ = {
@@ -83,14 +84,10 @@ class InputController {
     // Check if the target element is the one that has pointer lock
     if (document.pointerLockElement === this.target_) {
       console.log("Pointer Lock enabled");
-      this.isPointerLocked = true;
       hideInstructions();  // Hide instructions when locked
-      document.addEventListener('mousemove', (e) => this.onMouseMove_(e), false);
     } else {
       console.log("Pointer Lock disabled");
-      this.isPointerLocked = false;
       showInstructions();  // Show instructions when pointer lock is disabled
-      document.removeEventListener('mousemove', (e) => this.onMouseMove_(e), false);
     }
   }
 
@@ -175,7 +172,7 @@ class InputController {
 class FirstPersonCamera {
   constructor(camera, objects, sceneObjects, scene) {
     this.camera_ = camera;
-    this.input_ = new InputController();
+    this.input_ = new InputController(); 
     this.rotation_ = new THREE.Quaternion();
     this.baseHeight = 2; // Set the base height here (adjustable)
     this.translation_ = new THREE.Vector3(0, this.baseHeight, 0);
