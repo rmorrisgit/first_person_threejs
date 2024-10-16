@@ -1,5 +1,7 @@
 import * as THREE from 'https://cdn.skypack.dev/three@0.136';
 import Stats from 'https://cdn.skypack.dev/three@0.136.0/examples/jsm/libs/stats.module.js';
+import { EXRLoader } from 'https://cdn.skypack.dev/three@0.136/examples/jsm/loaders/EXRLoader.js';
+import { DecalGeometry } from 'https://cdn.skypack.dev/three@0.136/examples/jsm/geometries/DecalGeometry.js';
 
 
 const KEYS = {
@@ -24,10 +26,14 @@ const hideInstructions = () => {
 };
 
 
-  // Add click event to request pointer lock
-  document.body.addEventListener('click', () => {
-    document.body.requestPointerLock();
-  });
+// Modify the global click event to check for pointer lock state
+document.body.addEventListener('click', () => {
+  if (!document.pointerLockElement) {
+    document.body.requestPointerLock();  // Only request pointer lock if it's not active
+  }
+});
+
+
 
 class InputController {
   constructor(target) {
@@ -61,7 +67,8 @@ class InputController {
   }
 
   requestPointerLock_() {
-    if (!this.isPointerLocked) {
+    // Check if pointer lock is already active
+    if (document.pointerLockElement !== this.target_) {
       if (this.target_.requestPointerLock) {
         this.target_.requestPointerLock();
       } else {
@@ -73,19 +80,19 @@ class InputController {
   }
 
   onPointerLockChange_() {
+    // Check if the target element is the one that has pointer lock
     if (document.pointerLockElement === this.target_) {
       console.log("Pointer Lock enabled");
-      this.isPointerLocked = true; // Set state to true
-      hideInstructions(); // Call your function to hide instructions
-      // Add mouse move listener only when pointer is locked
+      this.isPointerLocked = true;
+      hideInstructions();  // Hide instructions when locked
       document.addEventListener('mousemove', (e) => this.onMouseMove_(e), false);
     } else {
       console.log("Pointer Lock disabled");
-      this.isPointerLocked = false; // Set state to false
-      showInstructions(); // Call your function to show instructions
-      // Remove mouse move listener when pointer is not locked
+      this.isPointerLocked = false;
+      showInstructions();  // Show instructions when pointer lock is disabled
       document.removeEventListener('mousemove', (e) => this.onMouseMove_(e), false);
-    }}
+    }
+  }
 
   onMouseMove_(e) {
   // Ignore mouse movement when not locked
@@ -166,16 +173,17 @@ class InputController {
 
 
 class FirstPersonCamera {
-  constructor(camera, objects) {
+  constructor(camera, objects, sceneObjects, scene) {
     this.camera_ = camera;
     this.input_ = new InputController();
     this.rotation_ = new THREE.Quaternion();
-    this.translation_ = new THREE.Vector3(0, 2, 0);
+    this.baseHeight = 2.5; // Set the base height here (adjustable)
+    this.translation_ = new THREE.Vector3(0, this.baseHeight, 0);
     this.phi_ = 0;
     this.phiSpeed_ = 8;
     this.theta_ = 0;
     this.thetaSpeed_ = 5;
-    this.moveSpeed_ = 12; // Adjust this value for movement speed
+    this.moveSpeed_ = 20; // Adjust this value for movement speed
     this.lookSpeed_ = 5;  // Adjust this value for look speed
   
     this.charge = 1;      // Full charge starts at 1
@@ -183,8 +191,7 @@ class FirstPersonCamera {
     this.headBobActive_ = false;
     this.headBobTimer_ = 0;
     this.headBobSpeed_ = 10;
-    this.headBobHeight_ = .1;
-    this.objects_ = objects;
+    this.headBobHeight_ = .15;
     this.rechargeRate = 0.05; // Rate at which the charge recovers
   this.chargeRecoverDelay = 2; // Delay before charge starts recovering after sprinting
   this.lastSprintedAt = null; // Store the last time the player sprinted
@@ -203,8 +210,11 @@ class FirstPersonCamera {
   this.verticalVelocity = 0; // Current vertical speed
 
   this.jumpHeight = 8; // Max height of the jump
-  this.groundLevel = 2; 
-     // Audio listener setup
+  this.groundLevel = this.baseHeight; // Set the ground level to the base height
+  this.objects_ = objects;
+  this.sceneObjects = sceneObjects || [];     // Audio listener setup
+  this.scene_ = scene;  // Store the scene for use in addDecal_
+
     // const listener = new THREE.AudioListener();
     // camera.add(listener);
     // this.footstepSound_ = new THREE.Audio(listener);
@@ -225,8 +235,58 @@ class FirstPersonCamera {
     this.updateCamera_(timeElapsedS);
     this.updateTranslation_(timeElapsedS);
     this.updateHeadBob_(timeElapsedS);
+    this.addDecal_();        // Check and add decals on mouse click
     this.input_.update(timeElapsedS);
   }
+  addDecal_() {
+    if (this.input_.current_.leftButton && !this.input_.previous_.leftButton) {  // On mouse click
+      const raycaster = new THREE.Raycaster();
+      const pos = {x:0, y:0};
+  
+      raycaster.setFromCamera(pos, this.camera_);
+      const hits = raycaster.intersectObjects(this.sceneObjects);
+  
+      console.log("Scene objects: ", this.sceneObjects);  // Debug: Check scene objects
+      console.log("Intersects: ", hits);  // Debug: Check raycast intersections
+  
+      if (!hits.length) {
+        return;
+      }
+      
+        const decalPosition = hits[0].point.clone();
+        const eye = decalPosition.clone();
+        eye.add(hits[0].face.normal)
+        console.log("Decal Position: ", decalPosition);
+        console.log("Decal Normal: ", eye);
+
+        const rotation = new THREE.Matrix4();
+        rotation.lookAt(eye, decalPosition, THREE.Object3D.DefaultUp);
+        const euler = new THREE.Euler();
+        euler.setFromRotationMatrix(rotation);
+  
+        const decalSize = new THREE.Vector3(1, 1, 1);  // Try a smaller size
+        const decalGeometry = new DecalGeometry(
+                    hits[0].object, hits[0].point, euler, decalSize);
+        const decalMaterial = new THREE.MeshStandardMaterial({
+          color: 0xFFFFFF,  // Simple white decal
+          depthTest: true,
+          depthWrite: false,
+          polygonOffset: true,
+          polygonOffsetFactor: -5
+        });
+  
+        const decalMesh = new THREE.Mesh(decalGeometry, decalMaterial);
+        decalMesh.receiveShadow = true;
+        this.scene_.add(decalMesh);
+              // Debug with a test object
+      const testBox = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.1, 0.1), new THREE.MeshBasicMaterial({color: 0xFFff00}));
+      testBox.position.copy(decalPosition);  // Position the test object where the decal should be
+      this.scene_.add(testBox);
+      }
+    }
+ 
+  
+  
 
   updateCamera_(_) {
     this.camera_.quaternion.copy(this.rotation_);
@@ -296,7 +356,7 @@ class FirstPersonCamera {
 
  // Adjust current movement speed based on sprinting
  const currentMoveSpeed = isSprinting ? this.moveSpeed_ * 2 : this.moveSpeed_;
-
+ const strafeSpeed = isSprinting ? this.moveSpeed_ * 1.2 : currentMoveSpeed;  
  // Manage sprint charge
  if (isSprinting) {
      this.charge = clamp(this.charge - this.chargeDecreaseRate * timeElapsedS, 0, 1);
@@ -317,6 +377,7 @@ class FirstPersonCamera {
    if (this.translation_.y <= this.groundLevel) {
        this.isJumping = false;  // Player has landed
        this.jumpVelocity = 0;   // Reset jump velocity
+       
        console.log("Player has landed.");  // Debug log for landing
    }
 }
@@ -337,14 +398,14 @@ class FirstPersonCamera {
      const qx = new THREE.Quaternion();
      qx.setFromAxisAngle(new THREE.Vector3(0, 1, 0), this.phi_);
 
-    const forward = new THREE.Vector3(0, 0, -1);
-    forward.applyQuaternion(qx);
-    forward.multiplyScalar(forwardVelocity * timeElapsedS * currentMoveSpeed); // Use currentMoveSpeed here
-
-    const left = new THREE.Vector3(-1, 0, 0);
-    left.applyQuaternion(qx);
-    left.multiplyScalar(strafeVelocity * timeElapsedS * currentMoveSpeed); // Use currentMoveSpeed here
-
+     const forward = new THREE.Vector3(0, 0, -1);
+     forward.applyQuaternion(qx);
+     forward.multiplyScalar(forwardVelocity * timeElapsedS * currentMoveSpeed); // Use current move speed for forward movement
+   
+     const left = new THREE.Vector3(-1, 0, 0);
+     left.applyQuaternion(qx);
+     left.multiplyScalar(strafeVelocity * timeElapsedS * strafeSpeed); // Use strafing speed for side movement
+   // Use strafing speed for side movement
     this.translation_.add(forward);
     this.translation_.add(left);
 
@@ -416,7 +477,7 @@ class FirstPersonCameraDemo {
   initializeDemo_() {
    
 
-    this.fpsCamera_ = new FirstPersonCamera(this.camera_, this.objects_);
+    this.fpsCamera_ = new FirstPersonCamera(this.camera_, this.objects_, this.sceneObjects, this.scene_);
   }
 
   initializeRenderer_() {
@@ -558,20 +619,73 @@ class FirstPersonCameraDemo {
 
     const mapLoader = new THREE.TextureLoader();
     const maxAnisotropy = this.threejs_.capabilities.getMaxAnisotropy();
-    const checkerboard = mapLoader.load('resources/checkerboard.png');
-    checkerboard.anisotropy = maxAnisotropy;
-    checkerboard.wrapS = THREE.RepeatWrapping;
-    checkerboard.wrapT = THREE.RepeatWrapping;
-    checkerboard.repeat.set(32, 32);
-    checkerboard.encoding = THREE.sRGBEncoding;
+    // const checkerboard = mapLoader.load('resources/checkerboard.png');
+    // checkerboard.anisotropy = maxAnisotropy;
+    // checkerboard.wrapS = THREE.RepeatWrapping;
+    // checkerboard.wrapT = THREE.RepeatWrapping;
+    // checkerboard.repeat.set(32, 32);
+    // checkerboard.encoding = THREE.sRGBEncoding;
 
-    const plane = new THREE.Mesh(
-        new THREE.PlaneGeometry(100, 100, 10, 10),
-        new THREE.MeshStandardMaterial({map: checkerboard}));
-    plane.castShadow = false;
-    plane.receiveShadow = true;
-    plane.rotation.x = -Math.PI / 2;
-    this.scene_.add(plane);
+    // const plane = new THREE.Mesh(
+    //     new THREE.PlaneGeometry(100, 100, 10, 10),
+    //     new THREE.MeshStandardMaterial({map: checkerboard}));
+    // plane.castShadow = false;
+    // plane.receiveShadow = true;
+    // plane.rotation.x = -Math.PI / 2;
+    // this.scene_.add(plane);
+
+
+
+
+// Load the textures
+// Load the textures
+// Load the textures
+// Load the textures
+const diffuseMap = mapLoader.load('resources/asphalt_01_diff_2k.jpg');
+const displacementMap = mapLoader.load('resources/asphalt_01_disp_2k.png');
+
+// Load the .exr files for the normal and roughness maps
+const normalMap = new EXRLoader().load('resources/asphalt_01_nor_gl_2k.exr');
+const roughnessMap = new EXRLoader().load('resources/asphalt_01_rough_2k.exr');
+
+// Set texture properties (like wrapping for large surfaces)
+diffuseMap.wrapS = THREE.RepeatWrapping;
+diffuseMap.wrapT = THREE.RepeatWrapping;
+normalMap.wrapS = THREE.RepeatWrapping;
+normalMap.wrapT = THREE.RepeatWrapping;
+roughnessMap.wrapS = THREE.RepeatWrapping;
+roughnessMap.wrapT = THREE.RepeatWrapping;
+displacementMap.wrapS = THREE.RepeatWrapping;
+displacementMap.wrapT = THREE.RepeatWrapping;
+
+// Adjust the repeat settings to control tiling (change these based on your visual needs)
+diffuseMap.repeat.set(8, 8);  // Adjust tiling if necessary
+normalMap.repeat.set(8, 8); 
+roughnessMap.repeat.set(8, 8); 
+displacementMap.repeat.set(8, 8); 
+
+// Create the material using the loaded textures
+const asphaltMaterial = new THREE.MeshStandardMaterial({
+  map: diffuseMap,               // Diffuse map for base color
+  normalMap: normalMap,           // EXR normal map for surface details
+  roughnessMap: roughnessMap,     // EXR roughness map for reflections
+  displacementMap: displacementMap,  // Displacement map for geometry depth
+  displacementScale: 0.05         // Adjust based on the depth you want
+});
+
+// Apply the material to a plane geometry
+const plane = new THREE.Mesh(
+  new THREE.PlaneGeometry(100, 100, 100, 100),  // More segments for displacement
+  asphaltMaterial
+);
+
+// Set shadow and position properties
+plane.castShadow = false;
+plane.receiveShadow = true;
+plane.rotation.x = -Math.PI / 2;
+
+this.scene_.add(plane);
+
 
     const box = new THREE.Mesh(
       new THREE.BoxGeometry(4, 4, 4),
@@ -619,14 +733,18 @@ class FirstPersonCameraDemo {
     // do some easy intersection tests.
     const meshes = [
       plane, box, wall1, wall2, wall3, wall4];
-
+  
     this.objects_ = [];
 
-    for (let i = 0; i < meshes.length; ++i) {
-      const b = new THREE.Box3();
-      b.setFromObject(meshes[i]);
-      this.objects_.push(b);
-    }
+   // You can still create bounding boxes if needed, but don't pass them to raycasting
+   const boundingBoxes = meshes.map(mesh => {
+    const b = new THREE.Box3();
+    b.setFromObject(mesh);
+    return b;
+  });
+
+  this.sceneObjects = [plane, box, wall1, wall2, wall3, wall4];
+
 
     // Crosshair
     const crosshair = mapLoader.load('resources/crosshair.png');
