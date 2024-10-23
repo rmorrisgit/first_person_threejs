@@ -755,7 +755,7 @@ this.scene_.add(plane);
     this.uiScene_.add(this.sprite_);
   }
 
- 
+ //raycast decal version
 
   onWindowResize_() {
     this.camera_.aspect = window.innerWidth / window.innerHeight;
