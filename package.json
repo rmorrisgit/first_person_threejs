@@ -1,0 +1,5 @@
+{
+  "dependencies": {
+    "three-octree": "^0.6.1"
+  }
+}
