@@ -150,6 +150,7 @@ class Player {
     this.scene = scene;
     this.octree = octree;
     this.position = new THREE.Vector3(0, 2, 0); // Initial player position
+    this.groundLevel = this.position.y; // Set default ground level
 
     this.capsule = new Capsule(
       new THREE.Vector3(0, 1, 0), // Capsule base
@@ -166,30 +167,32 @@ class Player {
 
   handleCollision(velocity) {
     const result = this.octree.capsuleIntersect(this.capsule);
-  
+
     if (result) {
-      console.log("Collision detected:", result);
-  
-      // Adjust velocity based on the collision normal
-      const normalComponent = result.normal.dot(velocity);
-      if (normalComponent < 0) {
-        velocity.addScaledVector(result.normal, -normalComponent);
-      }
-  
-      // Move the player out of the object along the collision normal
-      this.position.add(result.normal.multiplyScalar(result.depth + 0.01)); // Small offset to prevent clipping
-  
-      // Update capsule position
-      this.updateCapsulePosition();
-  
-      // Check if the collision normal is facing upward, indicating the player has landed
-      if (result.normal.y > 0.5 && velocity.y <= 0) {
-        this.groundLevel = this.position.y; // Set ground level based on the collision surface
-        this.isJumping = false; // Stop jumping, player has landed
-        velocity.y = 0; // Reset vertical velocity to stop further falling
-      }
+        const normalComponent = result.normal.dot(velocity);
+        if (normalComponent < 0) {
+            velocity.addScaledVector(result.normal, -normalComponent);
+        }
+
+        this.position.add(result.normal.multiplyScalar(result.depth + 0.01));
+        this.updateCapsulePosition();
+
+        // Temporarily update ground level on any collision
+        this.groundLevel = this.position.y;
+        this.isGrounded = true;
+        this.isJumping = false;
+        velocity.y = 0;
+    } else {
+        this.isGrounded = false;
     }
-  }
+
+    console.log("Collision Result:", result ? "Collided" : "No Collision", 
+                "Surface Normal:", result ? result.normal.y : "N/A", 
+                "Is Grounded:", this.isGrounded, 
+                "Ground Level:", this.groundLevel);
+}
+
+
   /*  if (result) {
     // Detect if the collision is mostly with the ground
     const isGroundCollision = result.normal.y > 0.5;  // Ground collision if the normal is pointing mostly upwards
@@ -413,9 +416,6 @@ class FirstPersonCamera {
  const currentMoveSpeed = isSprinting ? this.moveSpeed_ * 2 : this.moveSpeed_;
  const strafeSpeed = isSprinting ? currentMoveSpeed * 0.8 : currentMoveSpeed * 0.8;  // Strafe speed for both cases
  // Manage sprint charge
- 
- 
- 
  if (isSprinting) {
      this.charge = clamp(this.charge - this.chargeDecreaseRate * timeElapsedS, 0, 1);
      this.updateChargeUI(this.charge);
@@ -424,41 +424,32 @@ class FirstPersonCamera {
      this.charge = clamp(this.charge + (this.rechargeRate * timeElapsedS), 0, 1);
      this.updateChargeUI(this.charge);
  }
-
  this.isSprinting = isSprinting; // Track sprinting state
  
- // Handle jumping logic
-    // Apply gravity if the player is airborne
-    if (this.isJumping) {
-      this.translation_.y += this.jumpVelocity * timeElapsedS;
-      this.jumpVelocity += this.gravity * timeElapsedS; // Gravity always applies when jumping
-
-      // Check if player has landed
-      if (this.translation_.y <= this.groundLevel) {
-          this.isJumping = false;
-          this.translation_.y = this.groundLevel; // Ensure the player doesn't sink below the ground
-          this.jumpVelocity = 0;
-      }
-  }
-
-  // Jumping logic (only allow jumping when grounded)
-  if (!this.isJumping && this.input_.key(32)) {  // Space key for jump
+    // Jump initiation
+    if (this.isGrounded && this.input_.key(32)) { // Space key for jump
       this.isJumping = true;
       const sprintFactor = isSprinting ? 1.7 : 1;
-      this.jumpVelocity = Math.sqrt(2 * -this.gravity * this.jumpHeight) * sprintFactor;
+      this.velocity.y = Math.sqrt(2 * -this.gravity * this.jumpHeight) * sprintFactor;
+      this.isGrounded = false;
+  }
+  // Apply gravity if not grounded
+  if (!this.isGrounded) {
+      this.velocity.y += this.gravity * timeElapsedS;
   }
 
- // Handle jumping
-//  if (!this.isJumping && this.translation_.y <= this.groundLevel && this.input_.key(32)) {
-//      // Only jump if grounded
-//      this.isJumping = true;
-//      const sprintFactor = isSprinting ? 1.7 : 1; // Jump higher if sprinting
-//      this.jumpVelocity = Math.sqrt(2 * -this.gravity * this.jumpHeight) * sprintFactor;
-//      console.log("Jump initiated. Jump velocity:", this.jumpVelocity); // Debug log
-//  }
+// Apply vertical movement
+this.translation_.y += this.velocity.y * timeElapsedS;
+
+// Check if the player is below ground level
+if (this.translation_.y < this.groundLevel) {
+  this.translation_.y = this.groundLevel; // Snap to ground level
+  this.velocity.y = 0;  // Stop downward velocity
+  this.isGrounded = true; // Mark as grounded
+  this.isJumping = false;
+}
 
  // Handle movement and head bobbing
- this.isMoving = forwardVelocity || strafeVelocity; // Moving if any velocity
 
     // Handle movement
     this.isMoving = forwardVelocity || strafeVelocity;
@@ -487,7 +478,12 @@ class FirstPersonCamera {
  // After handling collisions, update translation again
  this.translation_.copy(this.player_.getPosition());
 
- this.groundLevel = Math.max(this.translation_.y, this.groundLevel); // Update based on the highest position, so you don't get reset to a lower ground level
+   // If grounded (confirmed by collision), snap to ground level
+   if (this.isGrounded) {
+    this.translation_.y = this.groundLevel; // Snap to ground level only when confirmed grounded
+    this.velocity.y = 0;
+}
+ 
 
     //   // Play footstep sound when moving
     //   if (!this.footstepSound_.isPlaying) {
