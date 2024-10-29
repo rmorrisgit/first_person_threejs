@@ -249,15 +249,8 @@ class FirstPersonCamera {
   this.headBobSpeed_ = 12;
   this.headBobHeight_ = .13;
 
-  this.charge = 1;      // Full charge starts at 1
-  this.chargeDecreaseRate = 0.1; 
-  this.rechargeRate = 0.05; // Rate at which the charge recovers
-  this.chargeRecoverDelay = 2; // Delay before charge starts recovering after sprinting
-  this.lastSprintedAt = null; // Store the last time the player sprinted
   this.isSprinting = false; // State for sprinting
   this.sprintTimeout = false; // Sprint timeout state
-  this.timeoutDuration = 5; // Timeout duration in seconds
-  this.lastChargeDepletedAt = null; // Timestamp when charge reaches 0
   // Jumping variables
   this.isJumping = false; // State to track if the player is jumping
   this.velocity = new THREE.Vector3(0, 0, 0); // 3D vector for velocity
@@ -376,7 +369,7 @@ class FirstPersonCamera {
   updateHeadBob_(timeElapsedS) {
     if (this.isJumping) {
       // Do not apply head bobbing when jumping
-      this.headBobTimer_ = 0; 
+      this.headBobTimer_ = 0; // Optionally reset timer while jumping
       // if (this.footstepSound_.isPlaying) {
       //     this.footstepSound_.stop(); // Stop sound if jumping
       // }
@@ -396,6 +389,8 @@ class FirstPersonCamera {
       //     }
       //   }
       // } else if (!this.isMoving) {
+      //   // Ensure head bobbing and sound stop immediately when not moving
+      //   this.headBobTimer_ = 0; // Reset the timer if not moving
       //   if (this.footstepSound_.isPlaying) {
       //     this.footstepSound_.stop(); // Stop sound immediately
       //   }
@@ -407,21 +402,13 @@ class FirstPersonCamera {
     const strafeVelocity = (this.input_.key(KEYS.a) ? 1 : 0) + (this.input_.key(KEYS.d) ? -1 : 0)
 
  // Check if the player can sprint
- const canSprint = this.charge > 0 && this.input_.key(KEYS.shift) && !this.isJumping;
+ const canSprint =  this.input_.key(KEYS.shift) && !this.isJumping;
  const isSprinting = canSprint;
 
  // Adjust current movement speed based on sprinting
  const currentMoveSpeed = isSprinting ? this.moveSpeed_ * 2 : this.moveSpeed_;
  const strafeSpeed = isSprinting ? currentMoveSpeed * 0.8 : currentMoveSpeed * 0.8;  // Strafe speed for both cases
- // Manage sprint charge
- if (isSprinting) {
-     this.charge = clamp(this.charge - this.chargeDecreaseRate * timeElapsedS, 0, 1);
-     this.updateChargeUI(this.charge);
- } else {
-     // Recover charge when not sprinting
-     this.charge = clamp(this.charge + (this.rechargeRate * timeElapsedS), 0, 1);
-     this.updateChargeUI(this.charge);
- }
+
  this.isSprinting = isSprinting; // Track sprinting state
  
     // Jump initiation
@@ -449,57 +436,54 @@ if (this.translation_.y < this.groundLevel) {
 
  // Handle movement and head bobbing
 
-  // Handle movement
-  this.isMoving = forwardVelocity || strafeVelocity;
-  if (this.isMoving) {
-      const qx = new THREE.Quaternion();
-      qx.setFromAxisAngle(new THREE.Vector3(0, 1, 0), this.phi_);
+    // Handle movement
+    this.isMoving = forwardVelocity || strafeVelocity;
+    if (this.isMoving) {
+        const qx = new THREE.Quaternion();
+        qx.setFromAxisAngle(new THREE.Vector3(0, 1, 0), this.phi_);
 
-      const forward = new THREE.Vector3(0, 0, -1);
-      forward.applyQuaternion(qx);
-      forward.multiplyScalar(forwardVelocity * timeElapsedS * currentMoveSpeed);
+        const forward = new THREE.Vector3(0, 0, -1);
+        forward.applyQuaternion(qx);
+        forward.multiplyScalar(forwardVelocity * timeElapsedS * currentMoveSpeed);
 
-      const left = new THREE.Vector3(-1, 0, 0);
-      left.applyQuaternion(qx);
-      left.multiplyScalar(strafeVelocity * timeElapsedS * strafeSpeed);
+        const left = new THREE.Vector3(-1, 0, 0);
+        left.applyQuaternion(qx);
+        left.multiplyScalar(strafeVelocity * timeElapsedS * strafeSpeed);
 
-      this.translation_.add(forward);
-      this.translation_.add(left);
-  }
-      // Update player's capsule position
-      this.player_.position.copy(this.translation_);
-      this.player_.updateCapsulePosition();
-
-      // Handle collisions
-      this.player_.handleCollision(this.velocity);
-
-      // After handling collisions, update translation again
-      this.translation_.copy(this.player_.getPosition());
-
-      // If grounded (confirmed by collision), snap to ground level
-      if (this.isGrounded) {
-        this.translation_.y = this.groundLevel; // Snap to ground level only when confirmed grounded
-        this.velocity.y = 0;
+        this.translation_.add(forward);
+        this.translation_.add(left);
     }
-      //   if (!this.footstepSound_.isPlaying) {
-      //     this.footstepSound_.play();
-      //   }
-      // } else {
-      //   if (this.footstepSound_.isPlaying) {
-      //     this.footstepSound_.stop();
-      //   }
-  }
-updateChargeUI(charge) {
-  const chargeDisplay = document.getElementById('charge-bar');
-  const chargeText = document.getElementById('charge-text');
-  
-  if (chargeDisplay) {
-    // Clamp the charge value between 0 and 1
-    charge = Math.max(0, Math.min(1, charge));
-    chargeDisplay.style.width = `${charge * 100}%`; // Corrected with backticks
-    chargeText.textContent = `${Math.round(charge * 100)}%`; // Corrected with backticks
-  }
+ // Update player's capsule position
+ this.player_.position.copy(this.translation_);
+ this.player_.updateCapsulePosition();
+
+ // Handle collisions
+ this.player_.handleCollision(this.velocity);
+
+ // After handling collisions, update translation again
+ this.translation_.copy(this.player_.getPosition());
+
+   // If grounded (confirmed by collision), snap to ground level
+   if (this.isGrounded) {
+    this.translation_.y = this.groundLevel; // Snap to ground level only when confirmed grounded
+    this.velocity.y = 0;
 }
+ 
+ 
+
+    //   // Play footstep sound when moving
+    //   if (!this.footstepSound_.isPlaying) {
+    //     this.footstepSound_.play();
+    //   }
+    // } else {
+    //   // Stop footstep sound when not moving
+    //   if (this.footstepSound_.isPlaying) {
+    //     this.footstepSound_.stop();
+    //   }
+    //   this.headBobActive_ = false; // Disable head bobbing when not moving
+  
+}
+
 
 
 
@@ -541,8 +525,9 @@ class FirstPersonCameraDemo {
 
   initialize_() {
     this.octree = new Octree();  // Initialize the octree here
+    this.createSecondaryScenes_();  // Create secondary scenes and cameras first
 
-    this.initializeLights_();
+    // this.initializeLights_();
     this.initializeScene_();
 
     this.player_ = new Player(this.scene_, this.octree); // Make sure this is created first
@@ -558,6 +543,8 @@ class FirstPersonCameraDemo {
     this.onWindowResize_();
 
   }
+
+
   onPointerLockChange_() {
     if (document.pointerLockElement === document.body) {
       console.log("Pointer Lock enabled");
@@ -578,12 +565,7 @@ class FirstPersonCameraDemo {
     this.threejs_.setSize(window.innerWidth, window.innerHeight);
     this.threejs_.physicallyCorrectLights = true;
     this.threejs_.outputEncoding = THREE.sRGBEncoding;
-  // Add tone mapping and exposure
-  this.threejs_.toneMapping = THREE.ReinhardToneMapping;
-  this.threejs_.toneMappingExposure = 2.0; // Increased exposure for visibility
 
-  this.threejs_.physicallyCorrectLights = true;
-  this.threejs_.outputEncoding = THREE.sRGBEncoding;
     document.body.appendChild(this.threejs_.domElement);
 
     window.addEventListener('resize', () => {
@@ -599,12 +581,12 @@ class FirstPersonCameraDemo {
 
     this.scene_ = new THREE.Scene();
 
-    this.uiCamera_ = new THREE.OrthographicCamera(
-        -1, 1, 1 * aspect, -1 * aspect, 1, 1000);
-    this.uiScene_ = new THREE.Scene();
-  
 
   }
+
+
+
+
   // Initialize FPS stats
   initStats() {
     this.stats = new Stats();
@@ -620,9 +602,7 @@ class FirstPersonCameraDemo {
   onWindowResize_() {
     this.camera_.aspect = window.innerWidth / window.innerHeight;
     this.camera_.updateProjectionMatrix();
-    this.uiCamera_.left = -this.camera_.aspect;
-    this.uiCamera_.right = this.camera_.aspect;
-    this.uiCamera_.updateProjectionMatrix();
+
     this.threejs_.setSize(window.innerWidth, window.innerHeight);
   }
 
@@ -664,34 +644,8 @@ class FirstPersonCameraDemo {
 
     return material;
   }
-  initializeLights_() {
-    // Spotlight setup
-    const distance = 50.0;
-    const angle = Math.PI / 4.0;
-    const penumbra = 0.5;
-    const decay = 1.0;
 
-    const spotLight = new THREE.SpotLight(
-        0xFFFFFF, 50.0, distance, angle, penumbra, decay
-    );
-    spotLight.castShadow = true;
-    spotLight.shadow.bias = -0.00001;
-    spotLight.shadow.mapSize.width = 4096;
-    spotLight.shadow.mapSize.height = 4096;
-    spotLight.shadow.camera.near = 1;
-    spotLight.shadow.camera.far = 100;
 
-    spotLight.position.set(25, 25, 0);
-    spotLight.lookAt(0, 0, 0);
-    this.scene_.add(spotLight);
-
-    // Hemisphere light for ambient effect
-    const upColour = 0xFFFF80;
-    const downColour = 0x808080;
-    const hemiLight = new THREE.HemisphereLight(upColour, downColour, 0.05);
-    hemiLight.position.set(0, 4, 0);
-    this.scene_.add(hemiLight);
-}
 
   initializeScene_() {
        // Octree must be initialized before adding objects to it
@@ -699,47 +653,73 @@ class FirstPersonCameraDemo {
         console.error("Octree is not initialized!");
         return;
       }
-    // const loader = new THREE.CubeTextureLoader();
+    const loader = new THREE.CubeTextureLoader();
+    const texture = loader.load([
+      './resources/skybox/posx.jpg',
+      './resources/skybox/negx.jpg',
+      './resources/skybox/posy.jpg',
+      './resources/skybox/negy.jpg',
+      './resources/skybox/posz.jpg',
+      './resources/skybox/negz.jpg',
+  ]);
+
+    texture.encoding = THREE.sRGBEncoding;
+    this.scene_.background = texture;
+
     const mapLoader = new THREE.TextureLoader();
     const maxAnisotropy = this.threejs_.capabilities.getMaxAnisotropy();
+    // const checkerboard = mapLoader.load('resources/checkerboard.png');
+    // checkerboard.anisotropy = maxAnisotropy;
+    // checkerboard.wrapS = THREE.RepeatWrapping;
+    // checkerboard.wrapT = THREE.RepeatWrapping;
+    // checkerboard.repeat.set(32, 32);
+    // checkerboard.encoding = THREE.sRGBEncoding;
+
+    // const plane = new THREE.Mesh(
+    //     new THREE.PlaneGeometry(100, 100, 10, 10),
+    //     new THREE.MeshStandardMaterial({map: checkerboard}));
+    // plane.castShadow = false;
+    // plane.receiveShadow = true;
+    // plane.rotation.x = -Math.PI / 2;
+    // this.scene_.add(plane);
 
       // Load the textures
-      const diffuseMap = mapLoader.load('resources/asphalt_01_diff_2k.jpg');
-      const displacementMap = mapLoader.load('resources/asphalt_01_disp_2k.png');
+      // Load the textures
+      // Load the textures
+      // Load the textures
+      const diffuseMap = mapLoader.load('resources/laminate_floor_02_diff_2k.jpg');
+      const displacementMap = mapLoader.load('resources/laminate_floor_02_disp_2k.png');
 
       // Load the .exr files for the normal and roughness maps
-      const normalMap = new EXRLoader().load('resources/asphalt_01_nor_gl_2k.exr');
-      const roughnessMap = new EXRLoader().load('resources/asphalt_01_rough_2k.exr');
+      const normalMap = new EXRLoader().load('resources/laminate_floor_02_nor_gl_2k.exr');
+      const roughnessMap = new EXRLoader().load('resources/laminate_floor_02_rough_2k.exr');
 
-      // Set texture properties (like wrapping for large surfaces)
-      diffuseMap.wrapS = THREE.RepeatWrapping;
-      diffuseMap.wrapT = THREE.RepeatWrapping;
-      normalMap.wrapS = THREE.RepeatWrapping;
-      normalMap.wrapT = THREE.RepeatWrapping;
-      roughnessMap.wrapS = THREE.RepeatWrapping;
-      roughnessMap.wrapT = THREE.RepeatWrapping;
-      displacementMap.wrapS = THREE.RepeatWrapping;
-      displacementMap.wrapT = THREE.RepeatWrapping;
+// Set texture properties
+diffuseMap.wrapS = diffuseMap.wrapT = THREE.RepeatWrapping;
+displacementMap.wrapS = displacementMap.wrapT = THREE.RepeatWrapping;
+normalMap.wrapS = normalMap.wrapT = THREE.RepeatWrapping;
+roughnessMap.wrapS = roughnessMap.wrapT = THREE.RepeatWrapping;
 
-      // Adjust the repeat settings to control tiling (change these based on your visual needs)
-      diffuseMap.repeat.set(8, 8);  // Adjust tiling if necessary
-      normalMap.repeat.set(8, 8); 
-      roughnessMap.repeat.set(8, 8); 
-      displacementMap.repeat.set(8, 8); 
+// Adjust the repeat settings to make the pattern smaller
+diffuseMap.repeat.set(20, 20);
+normalMap.repeat.set(20, 20);
+roughnessMap.repeat.set(20, 20);
+displacementMap.repeat.set(20, 20);
 
-      // Create the material using the loaded textures
-      const asphaltMaterial = new THREE.MeshStandardMaterial({
-        map: diffuseMap,               // Diffuse map for base color
-        normalMap: normalMap,           // EXR normal map for surface details
-        roughnessMap: roughnessMap,     // EXR roughness map for reflections
-        displacementMap: displacementMap,  // Displacement map for geometry depth
-        displacementScale: 0.05         // Adjust based on the depth you want
-      });
 
+// Create the material using the loaded textures
+const floorMaterial = new THREE.MeshStandardMaterial({
+  map: diffuseMap,
+  displacementMap: displacementMap,
+  displacementScale: 0.05, // Adjust as necessary for depth
+  normalMap: normalMap,
+  roughnessMap: roughnessMap,
+  roughness: 1 // Adjust based on your needs
+});
       // Apply the material to a plane geometry
       const plane = new THREE.Mesh(
         new THREE.PlaneGeometry(100, 100, 100, 100),  // More segments for displacement
-        asphaltMaterial
+        floorMaterial 
       );
 
       // Set shadow and position properties
@@ -749,77 +729,86 @@ class FirstPersonCameraDemo {
 
       this.scene_.add(plane);
 
-// Bulb Material and Geometry
-const bulbGeometry = new THREE.SphereGeometry(0.05, 16, 8);
-const bulbMaterial = new THREE.MeshStandardMaterial({
-    emissive: new THREE.Color(0xffdd88), // Warm glow color
-    emissiveIntensity: 20,               // Enhanced glow intensity
-    color: 0x333333                      // Dark base to avoid additional reflections
-});
-
-const bulbMesh = new THREE.Mesh(bulbGeometry, bulbMaterial);
-bulbMesh.position.set(0, 2, 0);
-this.scene_.add(bulbMesh);
-
-// PointLight for Illumination
-const bulbLight = new THREE.PointLight(0xffee88, 2, 15, 2); // Adjust decay for softer falloff
-bulbLight.position.copy(bulbMesh.position);
-bulbLight.castShadow = true;
-this.scene_.add(bulbLight);
       // Add plane to octree
       this.octree.fromGraphNode(plane);
 
-    const concreteMaterial = this.loadMaterial_('concrete3-', 4);
+      const concreteMaterial = this.loadMaterial_('concrete3-', 2);
+      const wallWidth = 30; // Reduced width
+      const wallHeight = 15; // Reduced height
+      const wallDepth = 1;
+  
+      // Adjusted positions for the tighter room
+      const wall1 = new THREE.Mesh(new THREE.BoxGeometry(wallWidth, wallHeight, wallDepth), concreteMaterial);
+      wall1.position.set(0, wallHeight / 2, -15);
+      wall1.castShadow = true;
+      wall1.receiveShadow = true;
+      this.scene_.add(wall1);
+  
+      const wall2 = new THREE.Mesh(new THREE.BoxGeometry(wallWidth, wallHeight, wallDepth), concreteMaterial);
+      wall2.position.set(0, wallHeight / 2, 15);
+      wall2.castShadow = true;
+      wall2.receiveShadow = true;
+      this.scene_.add(wall2);
+  
+      const wall3 = new THREE.Mesh(new THREE.BoxGeometry(wallDepth, wallHeight, wallWidth), concreteMaterial);
+      wall3.position.set(15, wallHeight / 2, 0);
+      wall3.castShadow = true;
+      wall3.receiveShadow = true;
+      this.scene_.add(wall3);
+  
+      const wall4 = new THREE.Mesh(new THREE.BoxGeometry(wallDepth, wallHeight, wallWidth), concreteMaterial);
+      wall4.position.set(-15, wallHeight / 2, 0);
+      wall4.castShadow = true;
+      wall4.receiveShadow = true;
+      this.scene_.add(wall4);
+// Add walls to octree for collision detection
+this.octree.fromGraphNode(wall1);
+this.octree.fromGraphNode(wall2);
+this.octree.fromGraphNode(wall3);
+this.octree.fromGraphNode(wall4);
 
-    const wall1 = new THREE.Mesh(
-      new THREE.BoxGeometry(100, 100, 4),
-      concreteMaterial);
-    wall1.position.set(0, -40, -50);
-    wall1.castShadow = true;
-    wall1.receiveShadow = true;
-    this.scene_.add(wall1);
+this.sceneObjects = [plane, wall1, wall2, wall3, wall4];
 
-    const wall2 = new THREE.Mesh(
-      new THREE.BoxGeometry(100, 100, 4),
-      concreteMaterial);
-    wall2.position.set(0, -40, 50);
-    wall2.castShadow = true;
-    wall2.receiveShadow = true;
-    this.scene_.add(wall2);
 
-    const wall3 = new THREE.Mesh(
-      new THREE.BoxGeometry(4, 100, 100),
-      concreteMaterial);
-    wall3.position.set(50, -40, 0);
-    wall3.castShadow = true;
-    wall3.receiveShadow = true;
-    this.scene_.add(wall3);
+    // Point Light
+    const bulbGeometry = new THREE.SphereGeometry(0.02, 16, 8);
+    const bulbMaterial = new THREE.MeshStandardMaterial({
+        emissive: 0xffffee,
+        emissiveIntensity: 1,
+        color: 0x000000
+    });
 
-    const wall4 = new THREE.Mesh(
-      new THREE.BoxGeometry(4, 100, 100),
-      concreteMaterial);
-    wall4.position.set(-50, -40, 0);
-    wall4.castShadow = true;
-    wall4.receiveShadow = true;
-    this.scene_.add(wall4);
+    const bulbLight = new THREE.PointLight(0xffee88, 1, 500, 1); // Adjusted distance and decay
+    bulbLight.add(new THREE.Mesh(bulbGeometry, bulbMaterial));
+    bulbLight.position.set(0, 3, 0);
+    bulbLight.castShadow = true;
+    this.scene_.add(bulbLight);
 
+    // Ambient Light
+    const ambientLight = new THREE.AmbientLight(0x404040, 0.5); 
+    this.scene_.add(ambientLight);
+
+    // Hemisphere Light
+    const hemiLight = new THREE.HemisphereLight(0xddeeff, 0x555555, 0.3); // Adjusted intensity
+    this.scene_.add(hemiLight);
+
+
+
+
+    // Create Box3 for each mesh in the scene so that we can
+    // do some easy intersection tests.
     const meshes = [
       plane, wall1, wall2, wall3, wall4];
   
     this.objects_ = [];
-    this.octree.fromGraphNode(wall1);
-    this.octree.fromGraphNode(wall2);
-    this.octree.fromGraphNode(wall3);
-    this.octree.fromGraphNode(wall4);
 
-    
+ 
+    // You can still create bounding boxes if needed, but don't pass them to raycasting
     const boundingBoxes = meshes.map(mesh => {
     const b = new THREE.Box3();
     b.setFromObject(mesh);
     return b;
     });
-
-    this.sceneObjects = [plane, wall1, wall2, wall3, wall4];
 
 
 
@@ -831,11 +820,179 @@ this.scene_.add(bulbLight);
       new THREE.SpriteMaterial({map: crosshair, color: 0xffffff, fog: false, depthTest: false, depthWrite: false}));
     this.sprite_.scale.set(0.15, 0.15 * this.camera_.aspect, 1)
     this.sprite_.position.set(0, 0, -10);
+    this.createViewingPlanes_();
 
-    this.uiScene_.add(this.sprite_);
+  }
+  createViewingPlanes_() {
+    // Reduce the height by adjusting the PlaneGeometry and BoxGeometry dimensions
+    const planeGeometry = new THREE.PlaneGeometry(4, 2.5); // Decrease height from 3 to 2.5 for a shorter screen
+    const verticalOffset = 2;
+
+    // Wall behind the screens, now moved to the opposite side
+    const wallGeometry = new THREE.PlaneGeometry(15, 10);
+    const wallMaterial = new THREE.MeshStandardMaterial({
+        color: 0x222222,
+        side: THREE.DoubleSide,
+    });
+    const wall = new THREE.Mesh(wallGeometry, wallMaterial);
+    wall.position.set(0, 2 + verticalOffset, -14);  // Adjusted to the opposite wall
+    this.scene_.add(wall);
+
+    // Arrange screens in a 3x2 grid with mounting brackets
+    const rows = 2;
+    const columns = 3;
+    const screenSpacingX = 4.5;
+    const screenSpacingY = 2.8;
+    this.viewingPlanes = [];
+
+    for (let row = 0; row < rows; row++) {
+        for (let col = 0; col < columns; col++) {
+            const index = row * columns + col;
+            if (index >= this.renderTargets.length) break;
+
+            const planeMaterial = new THREE.MeshBasicMaterial({ 
+                map: this.renderTargets[index].texture,
+                polygonOffset: true,
+                polygonOffsetFactor: -0.1,
+                polygonOffsetUnits: -0.1,
+            });
+            const viewingPlane = new THREE.Mesh(planeGeometry, planeMaterial);
+
+            viewingPlane.position.set(
+                -screenSpacingX + col * screenSpacingX,
+                4 - row * screenSpacingY + verticalOffset,
+                -13.8  // Adjusted to position screens close to the opposite wall
+            );
+            viewingPlane.rotation.y = 0;  // Adjusted rotation to face the room center
+
+            // Bezel adjusted to match new screen height
+            const bezelGeometry = new THREE.BoxGeometry(4.1, 2.6, 0.08); // Reduced height to match screen
+            const bezelMaterial = new THREE.MeshStandardMaterial({
+              color: 0x333333,
+              depthTest: true,
+              depthWrite: true,     // Ensure depth writing is enabled
+              transparent: false,    // Disable transparency
+              opacity: 1.0           // Full opacity
+          });
+            const bezel = new THREE.Mesh(bezelGeometry, bezelMaterial);
+            bezel.position.copy(viewingPlane.position);
+            bezel.position.z -= 0.05;  // Move bezel outward
+            bezel.rotation.copy(viewingPlane.rotation);
+            
+            // Brackets for mounting
+            const bracketGeometry = new THREE.BoxGeometry(0.08, 0.08, 0.4); 
+            const bracketMaterial = new THREE.MeshStandardMaterial({ color: 0x666666 });
+            const bracketOffsetZ = -0.2;
+            const bracketOffsetX = 1.2;
+            const bracketOffsetY = 1.0;
+
+            const bracket1 = new THREE.Mesh(bracketGeometry, bracketMaterial);
+            bracket1.position.set(
+                viewingPlane.position.x - bracketOffsetX, 
+                viewingPlane.position.y + bracketOffsetY, 
+                viewingPlane.position.z + bracketOffsetZ
+            );
+
+            const bracket2 = new THREE.Mesh(bracketGeometry, bracketMaterial);
+            bracket2.position.set(
+                viewingPlane.position.x + bracketOffsetX, 
+                viewingPlane.position.y + bracketOffsetY, 
+                viewingPlane.position.z + bracketOffsetZ
+            );
+
+            const bracket3 = new THREE.Mesh(bracketGeometry, bracketMaterial);
+            bracket3.position.set(
+                viewingPlane.position.x - bracketOffsetX, 
+                viewingPlane.position.y - bracketOffsetY, 
+                viewingPlane.position.z + bracketOffsetZ
+            );
+
+            const bracket4 = new THREE.Mesh(bracketGeometry, bracketMaterial);
+            bracket4.position.set(
+                viewingPlane.position.x + bracketOffsetX, 
+                viewingPlane.position.y - bracketOffsetY, 
+                viewingPlane.position.z + bracketOffsetZ
+            );
+
+            // Add to the scene
+            this.scene_.add(bezel, viewingPlane, bracket1, bracket2, bracket3, bracket4);
+            
+            // Track viewing planes for future reference
+            this.viewingPlanes.push(viewingPlane);
+          }
+    }
+}
+
+createSecondaryScenes_() {
+  this.sharedScene = new THREE.Scene();
+  this.secondaryCameras = [];
+  this.renderTargets = [];  
+
+  const cameraSettings = { fov: 45, aspect: 1, near: 0.1, far: 500 };
+  const renderTargetSize = 512;
+
+  for (let i = 0; i < 6; i++) {  // Updated for a 3x2 layout
+      const camera = new THREE.PerspectiveCamera(cameraSettings.fov, cameraSettings.aspect, cameraSettings.near, cameraSettings.far);
+      camera.position.set(0, 5, 10 * (i + 1));
+      camera.lookAt(0, 0, 0);
+
+      const renderTarget = new THREE.WebGLRenderTarget(renderTargetSize, renderTargetSize);
+      this.renderTargets.push(renderTarget);
+      this.secondaryCameras.push(camera);
   }
 
+  // Floor with texture
+  const mapLoader = new THREE.TextureLoader();
+  const floorTexture = mapLoader.load('resources/laminate_floor_02_diff_2k.jpg');
+  floorTexture.wrapS = floorTexture.wrapT = THREE.RepeatWrapping;
+  floorTexture.repeat.set(5, 5);
+  const floorMaterial = new THREE.MeshStandardMaterial({ map: floorTexture });
+  const floor = new THREE.Mesh(new THREE.PlaneGeometry(100, 100), floorMaterial);
+  floor.rotation.x = -Math.PI / 2;
+  this.sharedScene.add(floor);
 
+  // Basic walls to frame the space
+  const wallMaterial = new THREE.MeshStandardMaterial({ color: 0x555555 });
+  const wall1 = new THREE.Mesh(new THREE.BoxGeometry(100, 10, 1), wallMaterial);
+  wall1.position.set(0, 5, -50);
+  this.sharedScene.add(wall1);
+  const wall2 = wall1.clone();
+  wall2.position.set(0, 5, 50);
+  this.sharedScene.add(wall2);
+  const wall3 = wall1.clone();
+  wall3.rotation.y = Math.PI / 2;
+  wall3.position.set(-50, 5, 0);
+  this.sharedScene.add(wall3);
+  const wall4 = wall3.clone();
+  wall4.position.set(50, 5, 0);
+  this.sharedScene.add(wall4);
+
+  // Variety of objects
+  const geometries = [new THREE.BoxGeometry(3, 3, 3), new THREE.SphereGeometry(2, 32, 32), new THREE.CylinderGeometry(1.5, 1.5, 3, 32)];
+  geometries.forEach((geometry, index) => {
+      const color = Math.random() * 0xffffff;
+      const material = new THREE.MeshStandardMaterial({ color });
+      const mesh = new THREE.Mesh(geometry, material);
+      mesh.position.set(index * 10 - 10, 1.5, 0);  // Spread out objects in the scene
+      this.sharedScene.add(mesh);
+  });
+
+  // Lighting setup for the scene
+  const ambientLight = new THREE.AmbientLight(0x606060, 0.8);
+  this.sharedScene.add(ambientLight);
+
+  const directionalLight = new THREE.DirectionalLight(0xffffff, 0.6);
+  directionalLight.position.set(10, 20, 10);
+  directionalLight.castShadow = true;
+  this.sharedScene.add(directionalLight);
+
+  const spotlight = new THREE.SpotLight(0xffaa00, 1.2, 50, Math.PI / 6, 0.3, 1);
+  spotlight.position.set(-20, 15, -10);
+  spotlight.target.position.set(0, 0, 0);
+  spotlight.castShadow = true;
+  this.sharedScene.add(spotlight);
+  this.sharedScene.add(spotlight.target);
+}
 
   raf_() {
     requestAnimationFrame((t) => {
@@ -844,15 +1001,16 @@ this.scene_.add(bulbLight);
       }
 
       this.step_(t - this.previousRAF_);
-      // Adjust tone mapping exposure here
-      this.threejs_.toneMappingExposure = Math.pow(0.68, 5.0); 
-
       this.stats.begin(); 
       this.threejs_.autoClear = true;
-      this.threejs_.render(this.scene_, this.camera_);
-      
+
+      this.secondaryCameras.forEach((camera, i) => {
+        this.threejs_.setRenderTarget(this.renderTargets[i]);
+        this.threejs_.render(this.sharedScene, camera);
+    });
+    this.threejs_.setRenderTarget(null);  // Reset to render to screen
+    this.threejs_.render(this.scene_, this.camera_)
       this.threejs_.autoClear = false;
-      this.threejs_.render(this.uiScene_, this.uiCamera_);
             this.stats.end(); // Stop measuring
       this.previousRAF_ = t;
          this.raf_();
