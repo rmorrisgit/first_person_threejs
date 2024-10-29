@@ -376,7 +376,7 @@ class FirstPersonCamera {
   updateHeadBob_(timeElapsedS) {
     if (this.isJumping) {
       // Do not apply head bobbing when jumping
-      this.headBobTimer_ = 0; // Optionally reset timer while jumping
+      this.headBobTimer_ = 0; 
       // if (this.footstepSound_.isPlaying) {
       //     this.footstepSound_.stop(); // Stop sound if jumping
       // }
@@ -396,8 +396,6 @@ class FirstPersonCamera {
       //     }
       //   }
       // } else if (!this.isMoving) {
-      //   // Ensure head bobbing and sound stop immediately when not moving
-      //   this.headBobTimer_ = 0; // Reset the timer if not moving
       //   if (this.footstepSound_.isPlaying) {
       //     this.footstepSound_.stop(); // Stop sound immediately
       //   }
@@ -451,53 +449,46 @@ if (this.translation_.y < this.groundLevel) {
 
  // Handle movement and head bobbing
 
-    // Handle movement
-    this.isMoving = forwardVelocity || strafeVelocity;
-    if (this.isMoving) {
-        const qx = new THREE.Quaternion();
-        qx.setFromAxisAngle(new THREE.Vector3(0, 1, 0), this.phi_);
+  // Handle movement
+  this.isMoving = forwardVelocity || strafeVelocity;
+  if (this.isMoving) {
+      const qx = new THREE.Quaternion();
+      qx.setFromAxisAngle(new THREE.Vector3(0, 1, 0), this.phi_);
 
-        const forward = new THREE.Vector3(0, 0, -1);
-        forward.applyQuaternion(qx);
-        forward.multiplyScalar(forwardVelocity * timeElapsedS * currentMoveSpeed);
+      const forward = new THREE.Vector3(0, 0, -1);
+      forward.applyQuaternion(qx);
+      forward.multiplyScalar(forwardVelocity * timeElapsedS * currentMoveSpeed);
 
-        const left = new THREE.Vector3(-1, 0, 0);
-        left.applyQuaternion(qx);
-        left.multiplyScalar(strafeVelocity * timeElapsedS * strafeSpeed);
+      const left = new THREE.Vector3(-1, 0, 0);
+      left.applyQuaternion(qx);
+      left.multiplyScalar(strafeVelocity * timeElapsedS * strafeSpeed);
 
-        this.translation_.add(forward);
-        this.translation_.add(left);
+      this.translation_.add(forward);
+      this.translation_.add(left);
+  }
+      // Update player's capsule position
+      this.player_.position.copy(this.translation_);
+      this.player_.updateCapsulePosition();
+
+      // Handle collisions
+      this.player_.handleCollision(this.velocity);
+
+      // After handling collisions, update translation again
+      this.translation_.copy(this.player_.getPosition());
+
+      // If grounded (confirmed by collision), snap to ground level
+      if (this.isGrounded) {
+        this.translation_.y = this.groundLevel; // Snap to ground level only when confirmed grounded
+        this.velocity.y = 0;
     }
- // Update player's capsule position
- this.player_.position.copy(this.translation_);
- this.player_.updateCapsulePosition();
-
- // Handle collisions
- this.player_.handleCollision(this.velocity);
-
- // After handling collisions, update translation again
- this.translation_.copy(this.player_.getPosition());
-
-   // If grounded (confirmed by collision), snap to ground level
-   if (this.isGrounded) {
-    this.translation_.y = this.groundLevel; // Snap to ground level only when confirmed grounded
-    this.velocity.y = 0;
-}
- 
- 
-
-    //   // Play footstep sound when moving
-    //   if (!this.footstepSound_.isPlaying) {
-    //     this.footstepSound_.play();
-    //   }
-    // } else {
-    //   // Stop footstep sound when not moving
-    //   if (this.footstepSound_.isPlaying) {
-    //     this.footstepSound_.stop();
-    //   }
-    //   this.headBobActive_ = false; // Disable head bobbing when not moving
-  
-}
+      //   if (!this.footstepSound_.isPlaying) {
+      //     this.footstepSound_.play();
+      //   }
+      // } else {
+      //   if (this.footstepSound_.isPlaying) {
+      //     this.footstepSound_.stop();
+      //   }
+  }
 updateChargeUI(charge) {
   const chargeDisplay = document.getElementById('charge-bar');
   const chargeText = document.getElementById('charge-text');
@@ -589,7 +580,8 @@ class FirstPersonCameraDemo {
     this.threejs_.outputEncoding = THREE.sRGBEncoding;
   // Add tone mapping and exposure
   this.threejs_.toneMapping = THREE.ReinhardToneMapping;
-  this.threejs_.toneMappingExposure = Math.pow(0.68, 5.0);  // Adjust exposure to control brightness
+  this.threejs_.toneMappingExposure = 2.0; // Increased exposure for visibility
+
   this.threejs_.physicallyCorrectLights = true;
   this.threejs_.outputEncoding = THREE.sRGBEncoding;
     document.body.appendChild(this.threejs_.domElement);
@@ -673,14 +665,15 @@ class FirstPersonCameraDemo {
     return material;
   }
   initializeLights_() {
-    // Existing spotlight setup
+    // Spotlight setup
     const distance = 50.0;
     const angle = Math.PI / 4.0;
     const penumbra = 0.5;
     const decay = 1.0;
 
-    let spotLight = new THREE.SpotLight(
-        0xFFFFFF, 100.0, distance, angle, penumbra, decay);
+    const spotLight = new THREE.SpotLight(
+        0xFFFFFF, 50.0, distance, angle, penumbra, decay
+    );
     spotLight.castShadow = true;
     spotLight.shadow.bias = -0.00001;
     spotLight.shadow.mapSize.width = 4096;
@@ -692,27 +685,12 @@ class FirstPersonCameraDemo {
     spotLight.lookAt(0, 0, 0);
     this.scene_.add(spotLight);
 
-    // Modify the Hemisphere Light for softer irradiance
+    // Hemisphere light for ambient effect
     const upColour = 0xFFFF80;
     const downColour = 0x808080;
-    const hemiLight = new THREE.HemisphereLight(upColour, downColour, 0.1); // Lower intensity for ambient effect
-    hemiLight.color.setHSL(0.6, 1, 0.6);
-    hemiLight.groundColor.setHSL(0.095, 1, 0.75);
+    const hemiLight = new THREE.HemisphereLight(upColour, downColour, 0.05);
     hemiLight.position.set(0, 4, 0);
     this.scene_.add(hemiLight);
-
-    // Add the incandescent bulb light for realistic decay
-    const bulbGeometry = new THREE.SphereGeometry(0.02, 16, 8);
-    this.bulbLight = new THREE.PointLight(0xffee88, 1, 100, 2); // Light color, intensity, distance, decay
-    this.bulbMat = new THREE.MeshStandardMaterial({
-        emissive: 0xffffee,
-        emissiveIntensity: 1,
-        color: 0x000000,
-    });
-    this.bulbLight.add(new THREE.Mesh(bulbGeometry, this.bulbMat));
-    this.bulbLight.position.set(0, 2, 0);
-    this.bulbLight.castShadow = true;
-    this.scene_.add(this.bulbLight);
 }
 
   initializeScene_() {
@@ -721,39 +699,10 @@ class FirstPersonCameraDemo {
         console.error("Octree is not initialized!");
         return;
       }
-    const loader = new THREE.CubeTextureLoader();
-  //   const texture = loader.load([
-  //     './resources/skybox/posx.jpg',
-  //     './resources/skybox/negx.jpg',
-  //     './resources/skybox/posy.jpg',
-  //     './resources/skybox/negy.jpg',
-  //     './resources/skybox/posz.jpg',
-  //     './resources/skybox/negz.jpg',
-  // ]);
-
-    // texture.encoding = THREE.sRGBEncoding;
-    // this.scene_.background = texture;
-
+    // const loader = new THREE.CubeTextureLoader();
     const mapLoader = new THREE.TextureLoader();
     const maxAnisotropy = this.threejs_.capabilities.getMaxAnisotropy();
-    // const checkerboard = mapLoader.load('resources/checkerboard.png');
-    // checkerboard.anisotropy = maxAnisotropy;
-    // checkerboard.wrapS = THREE.RepeatWrapping;
-    // checkerboard.wrapT = THREE.RepeatWrapping;
-    // checkerboard.repeat.set(32, 32);
-    // checkerboard.encoding = THREE.sRGBEncoding;
 
-    // const plane = new THREE.Mesh(
-    //     new THREE.PlaneGeometry(100, 100, 10, 10),
-    //     new THREE.MeshStandardMaterial({map: checkerboard}));
-    // plane.castShadow = false;
-    // plane.receiveShadow = true;
-    // plane.rotation.x = -Math.PI / 2;
-    // this.scene_.add(plane);
-
-      // Load the textures
-      // Load the textures
-      // Load the textures
       // Load the textures
       const diffuseMap = mapLoader.load('resources/asphalt_01_diff_2k.jpg');
       const displacementMap = mapLoader.load('resources/asphalt_01_disp_2k.png');
@@ -800,18 +749,26 @@ class FirstPersonCameraDemo {
 
       this.scene_.add(plane);
 
+// Bulb Material and Geometry
+const bulbGeometry = new THREE.SphereGeometry(0.05, 16, 8);
+const bulbMaterial = new THREE.MeshStandardMaterial({
+    emissive: new THREE.Color(0xffdd88), // Warm glow color
+    emissiveIntensity: 20,               // Enhanced glow intensity
+    color: 0x333333                      // Dark base to avoid additional reflections
+});
+
+const bulbMesh = new THREE.Mesh(bulbGeometry, bulbMaterial);
+bulbMesh.position.set(0, 2, 0);
+this.scene_.add(bulbMesh);
+
+// PointLight for Illumination
+const bulbLight = new THREE.PointLight(0xffee88, 2, 15, 2); // Adjust decay for softer falloff
+bulbLight.position.copy(bulbMesh.position);
+bulbLight.castShadow = true;
+this.scene_.add(bulbLight);
       // Add plane to octree
       this.octree.fromGraphNode(plane);
 
-    const box = new THREE.Mesh(
-      new THREE.BoxGeometry(4, 4, 4),
-      this.loadMaterial_('vintage-tile1_', 0.2));
-    box.position.set(10, 2, 0);
-    box.castShadow = true;
-    box.receiveShadow = true;
-    this.scene_.add(box);
-  // Add box to octree
-  this.octree.fromGraphNode(box);
     const concreteMaterial = this.loadMaterial_('concrete3-', 4);
 
     const wall1 = new THREE.Mesh(
@@ -846,53 +803,25 @@ class FirstPersonCameraDemo {
     wall4.receiveShadow = true;
     this.scene_.add(wall4);
 
-        // Create a ramp with a tilted plane
-        const rampMaterial = new THREE.MeshStandardMaterial({
-          color: 0x808080, // Simple gray material
-          roughness: 0.8,
-          metalness: 0.2,
-      });
-    const rampGeometry = new THREE.PlaneGeometry(10, 20); // A long ramp
-    const ramp = new THREE.Mesh(rampGeometry, rampMaterial);
-    ramp.rotation.x = -Math.PI / 6; // Tilt the ramp at 30 degrees
-    ramp.position.set(0, 2, 10); // Adjust the position of the ramp
-
-
-
-
-    ramp.castShadow = true;
-    ramp.receiveShadow = true;
-    this.scene_.add(ramp);
-
-    // Add the ramp to the octree for collision detection
-    this.octree.fromGraphNode(ramp);
-
-
-
-
-
-    // Create Box3 for each mesh in the scene so that we can
-    // do some easy intersection tests.
     const meshes = [
-      plane, box, wall1, wall2, wall3, wall4];
+      plane, wall1, wall2, wall3, wall4];
   
     this.objects_ = [];
     this.octree.fromGraphNode(wall1);
     this.octree.fromGraphNode(wall2);
     this.octree.fromGraphNode(wall3);
     this.octree.fromGraphNode(wall4);
-    const octreeHelper = new OctreeHelper(this.octree);
-    this.scene_.add(octreeHelper);
-    // You can still create bounding boxes if needed, but don't pass them to raycasting
+
+    
     const boundingBoxes = meshes.map(mesh => {
     const b = new THREE.Box3();
     b.setFromObject(mesh);
     return b;
     });
 
-    this.sceneObjects = [plane, box, wall1, wall2, wall3, wall4];
+    this.sceneObjects = [plane, wall1, wall2, wall3, wall4];
 
-    this.sceneObjects.push(ramp);
+
 
     // Crosshair
     const crosshair = mapLoader.load('resources/crosshair.png');
@@ -915,6 +844,9 @@ class FirstPersonCameraDemo {
       }
 
       this.step_(t - this.previousRAF_);
+      // Adjust tone mapping exposure here
+      this.threejs_.toneMappingExposure = Math.pow(0.68, 5.0); 
+
       this.stats.begin(); 
       this.threejs_.autoClear = true;
       this.threejs_.render(this.scene_, this.camera_);
