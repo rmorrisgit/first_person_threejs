@@ -1,10 +1,9 @@
 import * as THREE from 'https://cdn.skypack.dev/three@0.136';
 import Stats from 'https://cdn.skypack.dev/three@0.136.0/examples/jsm/libs/stats.module.js';
 import { EXRLoader } from 'https://cdn.skypack.dev/three@0.136/examples/jsm/loaders/EXRLoader.js';
-import { DecalGeometry } from 'https://cdn.skypack.dev/three@0.136/examples/jsm/geometries/DecalGeometry.js';
 import { Octree } from 'three/examples/jsm/math/Octree';
-import { OctreeHelper } from 'three/examples/jsm/helpers/OctreeHelper.js';
 import { Capsule } from 'three/examples/jsm/math/Capsule';
+import { RectAreaLight } from 'three';
 
 const KEYS = {
   'a': 65,
@@ -285,59 +284,8 @@ class FirstPersonCamera {
     // const playerPosition = this.player_.getPosition();
     // console.log("Player Position: ", playerPosition);
 
-    this.addDecal_();        // Check and add decals on mouse click
     this.input_.update(timeElapsedS);
   }
-
-  addDecal_() {
-    if (this.input_.current_.leftButton && !this.input_.previous_.leftButton) {  // On mouse click
-      const raycaster = new THREE.Raycaster();
-      const pos = {x:0, y:0};
-  
-      raycaster.setFromCamera(pos, this.camera_);
-      const hits = raycaster.intersectObjects(this.sceneObjects);
-  
-      console.log("Scene objects: ", this.sceneObjects);  // Debug: Check scene objects
-      console.log("Intersects: ", hits);  // Debug: Check raycast intersections
-  
-      if (!hits.length) {
-        return;
-      }
-      
-        const decalPosition = hits[0].point.clone();
-        const eye = decalPosition.clone();
-        eye.add(hits[0].face.normal)
-        console.log("Decal Position: ", decalPosition);
-        console.log("Decal Normal: ", eye);
-
-        const rotation = new THREE.Matrix4();
-        rotation.lookAt(eye, decalPosition, THREE.Object3D.DefaultUp);
-        const euler = new THREE.Euler();
-        euler.setFromRotationMatrix(rotation);
-  
-        const decalSize = new THREE.Vector3(1, 1, 1);  // Try a smaller size
-        const decalGeometry = new DecalGeometry(
-                    hits[0].object, hits[0].point, euler, decalSize);
-        const decalMaterial = new THREE.MeshStandardMaterial({
-          color: 0xFFFFFF,  // Simple white decal
-          depthTest: true,
-          depthWrite: false,
-          polygonOffset: true,
-          polygonOffsetFactor: -5
-        });
-  
-        const decalMesh = new THREE.Mesh(decalGeometry, decalMaterial);
-        decalMesh.receiveShadow = true;
-        this.scene_.add(decalMesh);
-              // Debug with a test object
-      const testBox = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.1, 0.1), new THREE.MeshBasicMaterial({color: 0xFFff00}));
-      testBox.position.copy(decalPosition);  // Position the test object where the decal should be
-      this.scene_.add(testBox);
-      }
-    }
- 
-  
-  
 
   updateCamera_(_) {
     this.camera_.quaternion.copy(this.rotation_);
@@ -653,18 +601,18 @@ class FirstPersonCameraDemo {
         console.error("Octree is not initialized!");
         return;
       }
-    const loader = new THREE.CubeTextureLoader();
-    const texture = loader.load([
-      './resources/skybox/posx.jpg',
-      './resources/skybox/negx.jpg',
-      './resources/skybox/posy.jpg',
-      './resources/skybox/negy.jpg',
-      './resources/skybox/posz.jpg',
-      './resources/skybox/negz.jpg',
-  ]);
+  //   const loader = new THREE.CubeTextureLoader();
+  //   const texture = loader.load([
+  //     './resources/skybox/posx.jpg',
+  //     './resources/skybox/negx.jpg',
+  //     './resources/skybox/posy.jpg',
+  //     './resources/skybox/negy.jpg',
+  //     './resources/skybox/posz.jpg',
+  //     './resources/skybox/negz.jpg',
+  // ]);
 
-    texture.encoding = THREE.sRGBEncoding;
-    this.scene_.background = texture;
+    // texture.encoding = THREE.sRGBEncoding;
+    // this.scene_.background = texture;
 
     const mapLoader = new THREE.TextureLoader();
     const maxAnisotropy = this.threejs_.capabilities.getMaxAnisotropy();
@@ -773,9 +721,8 @@ this.sceneObjects = [plane, wall1, wall2, wall3, wall4];
     // Point Light
     const bulbGeometry = new THREE.SphereGeometry(0.02, 16, 8);
     const bulbMaterial = new THREE.MeshStandardMaterial({
-        emissive: 0xffffee,
-        emissiveIntensity: 1,
-        color: 0x000000
+
+        color: 0xff0000
     });
 
     const bulbLight = new THREE.PointLight(0xffee88, 1, 500, 1); // Adjusted distance and decay
@@ -785,12 +732,12 @@ this.sceneObjects = [plane, wall1, wall2, wall3, wall4];
     this.scene_.add(bulbLight);
 
     // Ambient Light
-    const ambientLight = new THREE.AmbientLight(0x404040, 0.5); 
-    this.scene_.add(ambientLight);
+    // const ambientLight = new THREE.AmbientLight(0x404040, 0.5); 
+    // this.scene_.add(ambientLight);
 
     // Hemisphere Light
-    const hemiLight = new THREE.HemisphereLight(0xddeeff, 0x555555, 0.3); // Adjusted intensity
-    this.scene_.add(hemiLight);
+    // const hemiLight = new THREE.HemisphereLight(0xddeeff, 0x555555, 0.3); // Adjusted intensity
+    // this.scene_.add(hemiLight);
 
 
 
@@ -829,13 +776,13 @@ this.sceneObjects = [plane, wall1, wall2, wall3, wall4];
     const verticalOffset = 2;
 
     // Wall behind the screens, now moved to the opposite side
-    const wallGeometry = new THREE.PlaneGeometry(15, 10);
+    const wallGeometry = new THREE.PlaneGeometry(15, 6);
     const wallMaterial = new THREE.MeshStandardMaterial({
         color: 0x222222,
         side: THREE.DoubleSide,
     });
     const wall = new THREE.Mesh(wallGeometry, wallMaterial);
-    wall.position.set(0, 2 + verticalOffset, -14);  // Adjusted to the opposite wall
+    wall.position.set(0, 2.8 + verticalOffset, -14);  // Adjusted to the opposite wall
     this.scene_.add(wall);
 
     // Arrange screens in a 3x2 grid with mounting brackets
@@ -916,7 +863,10 @@ this.sceneObjects = [plane, wall1, wall2, wall3, wall4];
 
             // Add to the scene
             this.scene_.add(bezel, viewingPlane, bracket1, bracket2, bracket3, bracket4);
-            
+            const screenLight = new RectAreaLight(0x00aaff, .1, 4, 2.5); // Width and height match the monitor
+            screenLight.position.set(viewingPlane.position.x, viewingPlane.position.y, viewingPlane.position.z + 0.2);
+            screenLight.rotation.copy(viewingPlane.rotation); // Match screen rotation
+            this.scene_.add(screenLight);
             // Track viewing planes for future reference
             this.viewingPlanes.push(viewingPlane);
           }
@@ -978,8 +928,8 @@ createSecondaryScenes_() {
   });
 
   // Lighting setup for the scene
-  const ambientLight = new THREE.AmbientLight(0x606060, 0.8);
-  this.sharedScene.add(ambientLight);
+  // const ambientLight = new THREE.AmbientLight(0x606060, 0.8);
+  // this.sharedScene.add(ambientLight);
 
   const directionalLight = new THREE.DirectionalLight(0xffffff, 0.6);
   directionalLight.position.set(10, 20, 10);
