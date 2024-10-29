@@ -4,7 +4,8 @@ import { EXRLoader } from 'https://cdn.skypack.dev/three@0.136/examples/jsm/load
 import { Octree } from 'three/examples/jsm/math/Octree';
 import { Capsule } from 'three/examples/jsm/math/Capsule';
 import { RectAreaLight } from 'three';
-
+import { RectAreaLightUniformsLib } from 'three/examples/jsm/lights/RectAreaLightUniformsLib.js';
+RectAreaLightUniformsLib.init();
 const KEYS = {
   'a': 65,
   's': 83,
@@ -772,7 +773,7 @@ this.sceneObjects = [plane, wall1, wall2, wall3, wall4];
   }
   createViewingPlanes_() {
     // Reduce the height by adjusting the PlaneGeometry and BoxGeometry dimensions
-    const planeGeometry = new THREE.PlaneGeometry(4, 2.5); // Decrease height from 3 to 2.5 for a shorter screen
+    // const planeGeometry = new THREE.PlaneGeometry(4, 2.5); // Decrease height from 3 to 2.5 for a shorter screen
     const verticalOffset = 2;
 
     // Wall behind the screens, now moved to the opposite side
@@ -887,8 +888,9 @@ createSecondaryScenes_() {
       camera.lookAt(0, 0, 0);
 
       const renderTarget = new THREE.WebGLRenderTarget(renderTargetSize, renderTargetSize);
-      this.renderTargets.push(renderTarget);
-      this.secondaryCameras.push(camera);
+      renderTarget.texture.minFilter = THREE.LinearFilter;  // Use linear filtering for a smooth look
+      renderTarget.texture.generateMipmaps = false;  // Disable mipmaps if not needed
+      
   }
 
   // Floor with texture
