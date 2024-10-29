@@ -484,6 +484,7 @@ if (this.translation_.y < this.groundLevel) {
     this.velocity.y = 0;
 }
  
+ 
 
     //   // Play footstep sound when moving
     //   if (!this.footstepSound_.isPlaying) {
@@ -586,7 +587,11 @@ class FirstPersonCameraDemo {
     this.threejs_.setSize(window.innerWidth, window.innerHeight);
     this.threejs_.physicallyCorrectLights = true;
     this.threejs_.outputEncoding = THREE.sRGBEncoding;
-
+  // Add tone mapping and exposure
+  this.threejs_.toneMapping = THREE.ReinhardToneMapping;
+  this.threejs_.toneMappingExposure = Math.pow(0.68, 5.0);  // Adjust exposure to control brightness
+  this.threejs_.physicallyCorrectLights = true;
+  this.threejs_.outputEncoding = THREE.sRGBEncoding;
     document.body.appendChild(this.threejs_.domElement);
 
     window.addEventListener('resize', () => {
@@ -667,34 +672,48 @@ class FirstPersonCameraDemo {
 
     return material;
   }
-
   initializeLights_() {
+    // Existing spotlight setup
     const distance = 50.0;
     const angle = Math.PI / 4.0;
     const penumbra = 0.5;
     const decay = 1.0;
 
-    let light = new THREE.SpotLight(
+    let spotLight = new THREE.SpotLight(
         0xFFFFFF, 100.0, distance, angle, penumbra, decay);
-    light.castShadow = true;
-    light.shadow.bias = -0.00001;
-    light.shadow.mapSize.width = 4096;
-    light.shadow.mapSize.height = 4096;
-    light.shadow.camera.near = 1;
-    light.shadow.camera.far = 100;
+    spotLight.castShadow = true;
+    spotLight.shadow.bias = -0.00001;
+    spotLight.shadow.mapSize.width = 4096;
+    spotLight.shadow.mapSize.height = 4096;
+    spotLight.shadow.camera.near = 1;
+    spotLight.shadow.camera.far = 100;
 
-    light.position.set(25, 25, 0);
-    light.lookAt(0, 0, 0);
-    this.scene_.add(light);
+    spotLight.position.set(25, 25, 0);
+    spotLight.lookAt(0, 0, 0);
+    this.scene_.add(spotLight);
 
+    // Modify the Hemisphere Light for softer irradiance
     const upColour = 0xFFFF80;
     const downColour = 0x808080;
-    light = new THREE.HemisphereLight(upColour, downColour, 0.5);
-    light.color.setHSL( 0.6, 1, 0.6 );
-    light.groundColor.setHSL( 0.095, 1, 0.75 );
-    light.position.set(0, 4, 0);
-    this.scene_.add(light);
-  }
+    const hemiLight = new THREE.HemisphereLight(upColour, downColour, 0.1); // Lower intensity for ambient effect
+    hemiLight.color.setHSL(0.6, 1, 0.6);
+    hemiLight.groundColor.setHSL(0.095, 1, 0.75);
+    hemiLight.position.set(0, 4, 0);
+    this.scene_.add(hemiLight);
+
+    // Add the incandescent bulb light for realistic decay
+    const bulbGeometry = new THREE.SphereGeometry(0.02, 16, 8);
+    this.bulbLight = new THREE.PointLight(0xffee88, 1, 100, 2); // Light color, intensity, distance, decay
+    this.bulbMat = new THREE.MeshStandardMaterial({
+        emissive: 0xffffee,
+        emissiveIntensity: 1,
+        color: 0x000000,
+    });
+    this.bulbLight.add(new THREE.Mesh(bulbGeometry, this.bulbMat));
+    this.bulbLight.position.set(0, 2, 0);
+    this.bulbLight.castShadow = true;
+    this.scene_.add(this.bulbLight);
+}
 
   initializeScene_() {
        // Octree must be initialized before adding objects to it
@@ -703,17 +722,17 @@ class FirstPersonCameraDemo {
         return;
       }
     const loader = new THREE.CubeTextureLoader();
-    const texture = loader.load([
-      './resources/skybox/posx.jpg',
-      './resources/skybox/negx.jpg',
-      './resources/skybox/posy.jpg',
-      './resources/skybox/negy.jpg',
-      './resources/skybox/posz.jpg',
-      './resources/skybox/negz.jpg',
-  ]);
+  //   const texture = loader.load([
+  //     './resources/skybox/posx.jpg',
+  //     './resources/skybox/negx.jpg',
+  //     './resources/skybox/posy.jpg',
+  //     './resources/skybox/negy.jpg',
+  //     './resources/skybox/posz.jpg',
+  //     './resources/skybox/negz.jpg',
+  // ]);
 
-    texture.encoding = THREE.sRGBEncoding;
-    this.scene_.background = texture;
+    // texture.encoding = THREE.sRGBEncoding;
+    // this.scene_.background = texture;
 
     const mapLoader = new THREE.TextureLoader();
     const maxAnisotropy = this.threejs_.capabilities.getMaxAnisotropy();
