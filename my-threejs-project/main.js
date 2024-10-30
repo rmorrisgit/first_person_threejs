@@ -34,8 +34,6 @@ document.body.addEventListener('click', () => {
 });
 
 
-
-
 class InputController {
   constructor(target) { 
 
@@ -597,6 +595,11 @@ class FirstPersonCameraDemo {
 
 
   initializeScene_() {
+      this.sharedSceneDirectionalLight = new THREE.DirectionalLight(0xffffff, 0.6);
+      this.sharedSceneDirectionalLight.position.set(10, 20, 10);
+      this.sharedSceneDirectionalLight.castShadow = true;
+      this.sharedScene.add(this.sharedSceneDirectionalLight);
+
        // Octree must be initialized before adding objects to it
        if (!this.octree) {
         console.error("Octree is not initialized!");
@@ -798,13 +801,14 @@ this.sceneObjects = [plane, wall1, wall2, wall3, wall4];
             const index = row * columns + col;
             if (index >= this.renderTargets.length) break;
 
-            const planeMaterial = new THREE.MeshBasicMaterial({ 
-                map: this.renderTargets[index].texture,
-                polygonOffset: true,
-                polygonOffsetFactor: -0.1,
-                polygonOffsetUnits: -0.1,
-            });
-            const viewingPlane = new THREE.Mesh(planeGeometry, planeMaterial);
+const planeGeometry = new THREE.PlaneGeometry(4, 2.5);
+const planeMaterial = new THREE.MeshBasicMaterial({
+    map: this.renderTargets[index].texture,  // Each plane uses its specific render target
+    polygonOffset: true,
+    polygonOffsetFactor: -0.1,
+    polygonOffsetUnits: -0.1,
+});
+const viewingPlane = new THREE.Mesh(planeGeometry, planeMaterial);
 
             viewingPlane.position.set(
                 -screenSpacingX + col * screenSpacingX,
@@ -887,10 +891,13 @@ createSecondaryScenes_() {
       camera.position.set(0, 5, 10 * (i + 1));
       camera.lookAt(0, 0, 0);
 
-      const renderTarget = new THREE.WebGLRenderTarget(renderTargetSize, renderTargetSize);
+      const renderTarget = new THREE.WebGLRenderTarget(256, 256);
       renderTarget.texture.minFilter = THREE.LinearFilter;  // Use linear filtering for a smooth look
       renderTarget.texture.generateMipmaps = false;  // Disable mipmaps if not needed
-      
+      renderTarget.texture.encoding = THREE.sRGBEncoding;
+
+      this.secondaryCameras.push(camera); // Add camera to the array
+      this.renderTargets.push(renderTarget); // Add render target to the array
   }
 
   // Floor with texture
@@ -903,6 +910,10 @@ createSecondaryScenes_() {
   floor.rotation.x = -Math.PI / 2;
   this.sharedScene.add(floor);
 
+
+  
+  const ambientLight = new THREE.AmbientLight(0xffffff, 0.3); // Lower intensity for a subtle fill
+  this.sharedScene.add(ambientLight);
   // Basic walls to frame the space
   const wallMaterial = new THREE.MeshStandardMaterial({ color: 0x555555 });
   const wall1 = new THREE.Mesh(new THREE.BoxGeometry(100, 10, 1), wallMaterial);
@@ -955,17 +966,24 @@ createSecondaryScenes_() {
       this.step_(t - this.previousRAF_);
       this.stats.begin(); 
       this.threejs_.autoClear = true;
+    // Animate the directional light in the sharedScene
+    const time = new Date().getTime();
+    this.sharedSceneDirectionalLight.position.x = Math.cos(time * 0.002) * 10;
+    this.sharedSceneDirectionalLight.position.z = Math.sin(time * 0.002) * 10;
 
-      this.secondaryCameras.forEach((camera, i) => {
-        this.threejs_.setRenderTarget(this.renderTargets[i]);
-        this.threejs_.render(this.sharedScene, camera);
+    // Render the secondary cameras
+    this.secondaryCameras.forEach((camera, i) => {
+      this.threejs_.setRenderTarget(this.renderTargets[i]);
+      this.threejs_.render(this.sharedScene, camera);
     });
-    this.threejs_.setRenderTarget(null);  // Reset to render to screen
-    this.threejs_.render(this.scene_, this.camera_)
-      this.threejs_.autoClear = false;
-            this.stats.end(); // Stop measuring
-      this.previousRAF_ = t;
-         this.raf_();
+
+    this.threejs_.setRenderTarget(null); // Reset to render to screen
+    this.threejs_.render(this.scene_, this.camera_);
+    this.threejs_.autoClear = false;
+
+    this.stats.end();
+    this.previousRAF_ = t;
+    this.raf_();
     });
   }
 
