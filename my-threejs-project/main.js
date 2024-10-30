@@ -457,9 +457,19 @@ if (this.translation_.y < this.groundLevel) {
 
 class FirstPersonCameraDemo {
   constructor() {    
-    this.initializeRenderer_(); // Ensure this is called early
-    this.initialize_();   
+    this.cubeTextureLoader = new THREE.CubeTextureLoader();
+    this.skyboxTexture = this.cubeTextureLoader.load([
+      './resources/skybox/posx.jpg',
+      './resources/skybox/negx.jpg',
+      './resources/skybox/posy.jpg',
+      './resources/skybox/negy.jpg',
+      './resources/skybox/posz.jpg',
+      './resources/skybox/negz.jpg',
+    ]);
+   this.skyboxTexture.encoding = THREE.sRGBEncoding;
+   this.initializeRenderer_(); // Ensure this is called early
 
+   this.initialize_(); 
     document.addEventListener('pointerlockchange', () => this.onPointerLockChange_(), false);
 
     document.body.addEventListener('click', () => {
@@ -473,9 +483,9 @@ class FirstPersonCameraDemo {
   initialize_() {
     this.octree = new Octree();  // Initialize the octree here
     this.createSecondaryScenes_();  // Create secondary scenes and cameras first
+    this.initializeScene_();
 
     // this.initializeLights_();
-    this.initializeScene_();
 
     this.player_ = new Player(this.scene_, this.octree); // Make sure this is created first
 
@@ -646,28 +656,28 @@ class FirstPersonCameraDemo {
       const normalMap = new EXRLoader().load('resources/laminate_floor_02_nor_gl_2k.exr');
       const roughnessMap = new EXRLoader().load('resources/laminate_floor_02_rough_2k.exr');
 
-// Set texture properties
-diffuseMap.wrapS = diffuseMap.wrapT = THREE.RepeatWrapping;
-displacementMap.wrapS = displacementMap.wrapT = THREE.RepeatWrapping;
-normalMap.wrapS = normalMap.wrapT = THREE.RepeatWrapping;
-roughnessMap.wrapS = roughnessMap.wrapT = THREE.RepeatWrapping;
+    // Set texture properties
+    diffuseMap.wrapS = diffuseMap.wrapT = THREE.RepeatWrapping;
+    displacementMap.wrapS = displacementMap.wrapT = THREE.RepeatWrapping;
+    normalMap.wrapS = normalMap.wrapT = THREE.RepeatWrapping;
+    roughnessMap.wrapS = roughnessMap.wrapT = THREE.RepeatWrapping;
 
-// Adjust the repeat settings to make the pattern smaller
-diffuseMap.repeat.set(20, 20);
-normalMap.repeat.set(20, 20);
-roughnessMap.repeat.set(20, 20);
-displacementMap.repeat.set(20, 20);
+    // Adjust the repeat settings to make the pattern smaller
+    diffuseMap.repeat.set(20, 20);
+    normalMap.repeat.set(20, 20);
+    roughnessMap.repeat.set(20, 20);
+    displacementMap.repeat.set(20, 20);
 
 
-// Create the material using the loaded textures
-const floorMaterial = new THREE.MeshStandardMaterial({
-  map: diffuseMap,
-  displacementMap: displacementMap,
-  displacementScale: 0.05, // Adjust as necessary for depth
-  normalMap: normalMap,
-  roughnessMap: roughnessMap,
-  roughness: 1 // Adjust based on your needs
-});
+    // Create the material using the loaded textures
+    const floorMaterial = new THREE.MeshStandardMaterial({
+    map: diffuseMap,
+    displacementMap: displacementMap,
+    displacementScale: 0.05, // Adjust as necessary for depth
+    normalMap: normalMap,
+    roughnessMap: roughnessMap,
+    roughness: 1 // Adjust based on your needs
+    });
       // Apply the material to a plane geometry
       const plane = new THREE.Mesh(
         new THREE.PlaneGeometry(100, 100, 100, 100),  // More segments for displacement
@@ -684,46 +694,47 @@ const floorMaterial = new THREE.MeshStandardMaterial({
       // Add plane to octree
       this.octree.fromGraphNode(plane);
 
-      const concreteMaterial = this.loadMaterial_('concrete3-', 2);
-      const wallWidth = 30; // Reduced width
-      const wallHeight = 15; // Reduced height
-      const wallDepth = 1;
+      // const concreteMaterial = this.loadMaterial_('concrete3-', 2);
+      // const wallWidth = 30; // Reduced width
+      // const wallHeight = 15; // Reduced height
+      // const wallDepth = 1;
   
-      // Adjusted positions for the tighter room
-      const wall1 = new THREE.Mesh(new THREE.BoxGeometry(wallWidth, wallHeight, wallDepth), concreteMaterial);
-      wall1.position.set(0, wallHeight / 2, -15);
-      wall1.castShadow = true;
-      wall1.receiveShadow = true;
-      this.scene_.add(wall1);
+      // // Adjusted positions for the tighter room
+      // const wall1 = new THREE.Mesh(new THREE.BoxGeometry(wallWidth, wallHeight, wallDepth), concreteMaterial);
+      // wall1.position.set(0, wallHeight / 2, -15);
+      // wall1.castShadow = true;
+      // wall1.receiveShadow = true;
+      // this.scene_.add(wall1);
   
-      const wall2 = new THREE.Mesh(new THREE.BoxGeometry(wallWidth, wallHeight, wallDepth), concreteMaterial);
-      wall2.position.set(0, wallHeight / 2, 15);
-      wall2.castShadow = true;
-      wall2.receiveShadow = true;
-      this.scene_.add(wall2);
+      // const wall2 = new THREE.Mesh(new THREE.BoxGeometry(wallWidth, wallHeight, wallDepth), concreteMaterial);
+      // wall2.position.set(0, wallHeight / 2, 15);
+      // wall2.castShadow = true;
+      // wall2.receiveShadow = true;
+      // this.scene_.add(wall2);
   
-      const wall3 = new THREE.Mesh(new THREE.BoxGeometry(wallDepth, wallHeight, wallWidth), concreteMaterial);
-      wall3.position.set(15, wallHeight / 2, 0);
-      wall3.castShadow = true;
-      wall3.receiveShadow = true;
-      this.scene_.add(wall3);
+      // const wall3 = new THREE.Mesh(new THREE.BoxGeometry(wallDepth, wallHeight, wallWidth), concreteMaterial);
+      // wall3.position.set(15, wallHeight / 2, 0);
+      // wall3.castShadow = true;
+      // wall3.receiveShadow = true;
+      // this.scene_.add(wall3);
   
-      const wall4 = new THREE.Mesh(new THREE.BoxGeometry(wallDepth, wallHeight, wallWidth), concreteMaterial);
-      wall4.position.set(-15, wallHeight / 2, 0);
-      wall4.castShadow = true;
-      wall4.receiveShadow = true;
-      this.scene_.add(wall4);
-// Add walls to octree for collision detection
-this.octree.fromGraphNode(wall1);
-this.octree.fromGraphNode(wall2);
-this.octree.fromGraphNode(wall3);
-this.octree.fromGraphNode(wall4);
+      // const wall4 = new THREE.Mesh(new THREE.BoxGeometry(wallDepth, wallHeight, wallWidth), concreteMaterial);
+      // wall4.position.set(-15, wallHeight / 2, 0);
+      // wall4.castShadow = true;
+      // wall4.receiveShadow = true;
+      // this.scene_.add(wall4);
+  // Add walls to octree for collision detection
+    // this.octree.fromGraphNode(wall1);
+    // this.octree.fromGraphNode(wall2);
+    // this.octree.fromGraphNode(wall3);
+    // this.octree.fromGraphNode(wall4);
 
-this.sceneObjects = [plane, wall1, wall2, wall3, wall4];
+    // this.sceneObjects = [plane, wall1, wall2, wall3, wall4];
+    this.sceneObjects = [plane];
 
 
     // Point Light
-    const bulbGeometry = new THREE.SphereGeometry(0.02, 16, 8);
+    const bulbGeometry = new THREE.SphereGeometry(0.3, 26, 8);
     const bulbMaterial = new THREE.MeshStandardMaterial({
 
         color: 0xff0000
@@ -736,12 +747,12 @@ this.sceneObjects = [plane, wall1, wall2, wall3, wall4];
     this.scene_.add(bulbLight);
 
     // Ambient Light
-    // const ambientLight = new THREE.AmbientLight(0x404040, 0.5); 
-    // this.scene_.add(ambientLight);
+    const ambientLight = new THREE.AmbientLight(0x404040, 0.5); 
+    this.scene_.add(ambientLight);
 
     // Hemisphere Light
-    // const hemiLight = new THREE.HemisphereLight(0xddeeff, 0x555555, 0.3); // Adjusted intensity
-    // this.scene_.add(hemiLight);
+    const hemiLight = new THREE.HemisphereLight(0xddeeff, 0x555555, 0.3); // Adjusted intensity
+    this.scene_.add(hemiLight);
 
 
 
@@ -749,7 +760,7 @@ this.sceneObjects = [plane, wall1, wall2, wall3, wall4];
     // Create Box3 for each mesh in the scene so that we can
     // do some easy intersection tests.
     const meshes = [
-      plane, wall1, wall2, wall3, wall4];
+      plane];
   
     this.objects_ = [];
 
@@ -782,18 +793,18 @@ this.sceneObjects = [plane, wall1, wall2, wall3, wall4];
     // Wall behind the screens, now moved to the opposite side
     const wallGeometry = new THREE.PlaneGeometry(15, 6);
     const wallMaterial = new THREE.MeshStandardMaterial({
-        color: 0x222222,
+        color: 0xff2222,
         side: THREE.DoubleSide,
     });
     const wall = new THREE.Mesh(wallGeometry, wallMaterial);
     wall.position.set(0, 2.8 + verticalOffset, -14);  // Adjusted to the opposite wall
     this.scene_.add(wall);
-
-    // Arrange screens in a 3x2 grid with mounting brackets
+  
+//     // Arrange screens in a 3x2 grid with mounting brackets
     const rows = 2;
     const columns = 3;
-    const screenSpacingX = 4.5;
-    const screenSpacingY = 2.8;
+    const screenSpacingX = 3.8;  // Reduced spacing between screens horizontally
+    const screenSpacingY = 2.3;  // Reduced spacing between screens vertically
     this.viewingPlanes = [];
 
     for (let row = 0; row < rows; row++) {
@@ -801,7 +812,7 @@ this.sceneObjects = [plane, wall1, wall2, wall3, wall4];
             const index = row * columns + col;
             if (index >= this.renderTargets.length) break;
 
-const planeGeometry = new THREE.PlaneGeometry(4, 2.5);
+const planeGeometry = new THREE.PlaneGeometry(3.6, 2.2);
 const planeMaterial = new THREE.MeshBasicMaterial({
     map: this.renderTargets[index].texture,  // Each plane uses its specific render target
     polygonOffset: true,
@@ -810,64 +821,98 @@ const planeMaterial = new THREE.MeshBasicMaterial({
 });
 const viewingPlane = new THREE.Mesh(planeGeometry, planeMaterial);
 
-            viewingPlane.position.set(
-                -screenSpacingX + col * screenSpacingX,
-                4 - row * screenSpacingY + verticalOffset,
-                -13.8  // Adjusted to position screens close to the opposite wall
-            );
-            viewingPlane.rotation.y = 0;  // Adjusted rotation to face the room center
+  viewingPlane.position.set(
+      -screenSpacingX + col * screenSpacingX,
+      4 - row * screenSpacingY + verticalOffset,
+      -13.8  // Adjusted to position screens close to the opposite wall
+  );
+  viewingPlane.rotation.y = 0;  // Adjusted rotation to face the room center
 
-            // Bezel adjusted to match new screen height
-            const bezelGeometry = new THREE.BoxGeometry(4.1, 2.6, 0.08); // Reduced height to match screen
-            const bezelMaterial = new THREE.MeshStandardMaterial({
-              color: 0x333333,
-              depthTest: true,
-              depthWrite: true,     // Ensure depth writing is enabled
-              transparent: false,    // Disable transparency
-              opacity: 1.0           // Full opacity
-          });
-            const bezel = new THREE.Mesh(bezelGeometry, bezelMaterial);
-            bezel.position.copy(viewingPlane.position);
-            bezel.position.z -= 0.05;  // Move bezel outward
-            bezel.rotation.copy(viewingPlane.rotation);
-            
-            // Brackets for mounting
-            const bracketGeometry = new THREE.BoxGeometry(0.08, 0.08, 0.4); 
-            const bracketMaterial = new THREE.MeshStandardMaterial({ color: 0x666666 });
-            const bracketOffsetZ = -0.2;
-            const bracketOffsetX = 1.2;
-            const bracketOffsetY = 1.0;
+//   // Bezel adjusted to match new screen height
+//   const bezelGeometry = new THREE.BoxGeometry(4.1, 2.6, 0.08); // Reduced height to match screen
+//   const bezelMaterial = new THREE.MeshStandardMaterial({
+//     color: 0xff000,
+//     depthTest: true,
+//     depthWrite: true,     // Ensure depth writing is enabled
+//     transparent: false,    // Disable transparency
+//     opacity: 1.0           // Full opacity
+// });
+//   const bezel = new THREE.Mesh(bezelGeometry, bezelMaterial);
+//   bezel.position.copy(viewingPlane.position);
+//   bezel.position.z -= 0.05;  // Move bezel outward
+//   bezel.rotation.copy(viewingPlane.rotation);
 
-            const bracket1 = new THREE.Mesh(bracketGeometry, bracketMaterial);
-            bracket1.position.set(
-                viewingPlane.position.x - bracketOffsetX, 
-                viewingPlane.position.y + bracketOffsetY, 
-                viewingPlane.position.z + bracketOffsetZ
-            );
 
-            const bracket2 = new THREE.Mesh(bracketGeometry, bracketMaterial);
-            bracket2.position.set(
-                viewingPlane.position.x + bracketOffsetX, 
-                viewingPlane.position.y + bracketOffsetY, 
-                viewingPlane.position.z + bracketOffsetZ
-            );
 
-            const bracket3 = new THREE.Mesh(bracketGeometry, bracketMaterial);
-            bracket3.position.set(
-                viewingPlane.position.x - bracketOffsetX, 
-                viewingPlane.position.y - bracketOffsetY, 
-                viewingPlane.position.z + bracketOffsetZ
-            );
+  const framePadding = 0.1; // Extra size for the bezel around the monitor
+  const frameDepth = 0.1; // Depth of the frame
+  
+  // Frame dimensions are slightly larger than the screen to create a visible bezel
+  const outerFrameGeometry = new THREE.BoxGeometry(
+    planeGeometry.parameters.width + framePadding,  // Width with padding
+    planeGeometry.parameters.height + framePadding, // Height with padding
+    frameDepth // Depth for visibility
+  );
+  
+  const outerFrameMaterial = new THREE.MeshStandardMaterial({
+    color: 0x000000,   // Dark frame color for contrast
+    metalness: 0.3,
+    roughness: 0.9,
+  });
+  
+  // Create the frame mesh and position it slightly in front of the viewing plane
+  const outerFrame = new THREE.Mesh(outerFrameGeometry, outerFrameMaterial);
+  outerFrame.position.copy(viewingPlane.position);
+  outerFrame.position.z -= frameDepth / 2 + 0.05; // Offset forward for visibility
+  outerFrame.rotation.copy(viewingPlane.rotation);
+  
+  // Add the frame to the scene
+  this.scene_.add(outerFrame);
 
-            const bracket4 = new THREE.Mesh(bracketGeometry, bracketMaterial);
-            bracket4.position.set(
-                viewingPlane.position.x + bracketOffsetX, 
-                viewingPlane.position.y - bracketOffsetY, 
-                viewingPlane.position.z + bracketOffsetZ
-            );
 
+// // Brackets for mounting
+// const bracketGeometry = new THREE.BoxGeometry(0.06, 0.06, 0.3);  // Increased bracket size slightly
+// const bracketMaterial = new THREE.MeshStandardMaterial({ color: 0x666666 });
+
+
+// // Reduced offsets for a tighter fit on smaller screens
+// const bracketOffsetZ = -0.15; 
+// const bracketOffsetX = 0.9; 
+// const bracketOffsetY = 0.75;
+
+// // Top-left bracket
+// const bracket1 = new THREE.Mesh(bracketGeometry, bracketMaterial);
+// bracket1.position.set(
+//     viewingPlane.position.x - bracketOffsetX, 
+//     viewingPlane.position.y + bracketOffsetY, 
+//     viewingPlane.position.z + bracketOffsetZ
+// );
+
+// // Top-right bracket
+// const bracket2 = new THREE.Mesh(bracketGeometry, bracketMaterial);
+// bracket2.position.set(
+//     viewingPlane.position.x + bracketOffsetX, 
+//     viewingPlane.position.y + bracketOffsetY, 
+//     viewingPlane.position.z + bracketOffsetZ
+// );
+
+// // Bottom-left bracket
+// const bracket3 = new THREE.Mesh(bracketGeometry, bracketMaterial);
+// bracket3.position.set(
+//     viewingPlane.position.x - bracketOffsetX, 
+//     viewingPlane.position.y - bracketOffsetY, 
+//     viewingPlane.position.z + bracketOffsetZ
+// );
+
+// // Bottom-right bracket
+// const bracket4 = new THREE.Mesh(bracketGeometry, bracketMaterial);
+// bracket4.position.set(
+//     viewingPlane.position.x + bracketOffsetX, 
+//     viewingPlane.position.y - bracketOffsetY, 
+//     viewingPlane.position.z + bracketOffsetZ
+// );
             // Add to the scene
-            this.scene_.add(bezel, viewingPlane, bracket1, bracket2, bracket3, bracket4);
+            this.scene_.add(viewingPlane);
             const screenLight = new RectAreaLight(0x00aaff, .1, 4, 2.5); // Width and height match the monitor
             screenLight.position.set(viewingPlane.position.x, viewingPlane.position.y, viewingPlane.position.z + 0.2);
             screenLight.rotation.copy(viewingPlane.rotation); // Match screen rotation
@@ -880,29 +925,30 @@ const viewingPlane = new THREE.Mesh(planeGeometry, planeMaterial);
 
 createSecondaryScenes_() {
   this.sharedScene = new THREE.Scene();
+  this.sharedScene.background = this.skyboxTexture; // Skybox texture only for the secondary scene
+
+  // Set up secondary cameras and render targets
   this.secondaryCameras = [];
-  this.renderTargets = [];  
-
+  this.renderTargets = [];
   const cameraSettings = { fov: 45, aspect: 1, near: 0.1, far: 500 };
-  const renderTargetSize = 512;
 
-  for (let i = 0; i < 6; i++) {  // Updated for a 3x2 layout
-      const camera = new THREE.PerspectiveCamera(cameraSettings.fov, cameraSettings.aspect, cameraSettings.near, cameraSettings.far);
-      camera.position.set(0, 5, 10 * (i + 1));
-      camera.lookAt(0, 0, 0);
+  for (let i = 0; i < 6; i++) {
+    const camera = new THREE.PerspectiveCamera(cameraSettings.fov, cameraSettings.aspect, cameraSettings.near, cameraSettings.far);
+    camera.position.set(0, 5, 10 * (i + 1));
+    camera.lookAt(0, 0, 0);
 
-      const renderTarget = new THREE.WebGLRenderTarget(256, 256);
-      renderTarget.texture.minFilter = THREE.LinearFilter;  // Use linear filtering for a smooth look
-      renderTarget.texture.generateMipmaps = false;  // Disable mipmaps if not needed
-      renderTarget.texture.encoding = THREE.sRGBEncoding;
+    const renderTarget = new THREE.WebGLRenderTarget(256, 256);
+    renderTarget.texture.minFilter = THREE.LinearFilter;
+    renderTarget.texture.generateMipmaps = false;
+    renderTarget.texture.encoding = THREE.sRGBEncoding;
 
-      this.secondaryCameras.push(camera); // Add camera to the array
-      this.renderTargets.push(renderTarget); // Add render target to the array
+    this.secondaryCameras.push(camera);
+    this.renderTargets.push(renderTarget);
   }
 
-  // Floor with texture
+  // Add specific objects to sharedScene (not main scene)
   const mapLoader = new THREE.TextureLoader();
-  const floorTexture = mapLoader.load('resources/laminate_floor_02_diff_2k.jpg');
+  const floorTexture = mapLoader.load('resources/concrete_floor_worn_001_rough_2k.jpg');
   floorTexture.wrapS = floorTexture.wrapT = THREE.RepeatWrapping;
   floorTexture.repeat.set(5, 5);
   const floorMaterial = new THREE.MeshStandardMaterial({ map: floorTexture });
@@ -910,51 +956,9 @@ createSecondaryScenes_() {
   floor.rotation.x = -Math.PI / 2;
   this.sharedScene.add(floor);
 
-
-  
-  const ambientLight = new THREE.AmbientLight(0xffffff, 0.3); // Lower intensity for a subtle fill
+  // Add lights, walls, and objects specific to sharedScene here
+  const ambientLight = new THREE.AmbientLight(0xffffff, 0.3);
   this.sharedScene.add(ambientLight);
-  // Basic walls to frame the space
-  const wallMaterial = new THREE.MeshStandardMaterial({ color: 0x555555 });
-  const wall1 = new THREE.Mesh(new THREE.BoxGeometry(100, 10, 1), wallMaterial);
-  wall1.position.set(0, 5, -50);
-  this.sharedScene.add(wall1);
-  const wall2 = wall1.clone();
-  wall2.position.set(0, 5, 50);
-  this.sharedScene.add(wall2);
-  const wall3 = wall1.clone();
-  wall3.rotation.y = Math.PI / 2;
-  wall3.position.set(-50, 5, 0);
-  this.sharedScene.add(wall3);
-  const wall4 = wall3.clone();
-  wall4.position.set(50, 5, 0);
-  this.sharedScene.add(wall4);
-
-  // Variety of objects
-  const geometries = [new THREE.BoxGeometry(3, 3, 3), new THREE.SphereGeometry(2, 32, 32), new THREE.CylinderGeometry(1.5, 1.5, 3, 32)];
-  geometries.forEach((geometry, index) => {
-      const color = Math.random() * 0xffffff;
-      const material = new THREE.MeshStandardMaterial({ color });
-      const mesh = new THREE.Mesh(geometry, material);
-      mesh.position.set(index * 10 - 10, 1.5, 0);  // Spread out objects in the scene
-      this.sharedScene.add(mesh);
-  });
-
-  // Lighting setup for the scene
-  // const ambientLight = new THREE.AmbientLight(0x606060, 0.8);
-  // this.sharedScene.add(ambientLight);
-
-  const directionalLight = new THREE.DirectionalLight(0xffffff, 0.6);
-  directionalLight.position.set(10, 20, 10);
-  directionalLight.castShadow = true;
-  this.sharedScene.add(directionalLight);
-
-  const spotlight = new THREE.SpotLight(0xffaa00, 1.2, 50, Math.PI / 6, 0.3, 1);
-  spotlight.position.set(-20, 15, -10);
-  spotlight.target.position.set(0, 0, 0);
-  spotlight.castShadow = true;
-  this.sharedScene.add(spotlight);
-  this.sharedScene.add(spotlight.target);
 }
 
   raf_() {
