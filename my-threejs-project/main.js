@@ -663,7 +663,13 @@ class FirstPersonCameraDemo {
     // texture.encoding = THREE.sRGBEncoding;
     // this.scene_.background = texture;
     // this.scene_.background = new THREE.Color(0xffffff);
+    const hemiLight = new THREE.HemisphereLight(0xddeeff, 0x555555, 0.3); // Adjusted intensity
+    this.scene_.add(hemiLight);
 
+// Lightbulb-style Point Light setup
+const lightHeight = 20;  // Positioning 20 feet off the ground
+const lightIntensity = 12;  // High intensity for a bright effect
+const lightDistance = 100;  // Large radius to illuminate the scene
 
 
     const loader = new GLTFLoader();
@@ -690,21 +696,32 @@ loader.load('resources/night_city_cartoon.glb', (gltf) => {
   
   this.scene_.add(city);
 });
- // Load and add the chair next to the desk
- loader.load('resources/Chair.glb', (gltf) => {
-  const chair = gltf.scene;
-  chair.scale.set(1, 1, 1); // Adjust scale if needed
-  chair.position.set(1, 0, 1); // Adjust position near the desk
-
-  this.scene_.add(chair);
-});
 
 
 
 
 
+// Create a PointLight for the "lightbulb" effect
+const bulbLight = new THREE.PointLight(0xffffff, lightIntensity, lightDistance, 2);  // Using decay of 2 for natural falloff
+bulbLight.position.set(0, lightHeight, 0);  // Positioning above the center of the scene
+bulbLight.castShadow = true;  // Enable shadows for a realistic look
+bulbLight.shadow.mapSize.width = 1024;  // Higher shadow map resolution for better quality
+bulbLight.shadow.mapSize.height = 1024;
+
+// Add a small sphere as a visual representation of the lightbulb
+const bulbGeometry = new THREE.SphereGeometry(0.5, 16, 8);
+const bulbMaterial = new THREE.MeshBasicMaterial({ color: 0xffffee });
+const bulbMesh = new THREE.Mesh(bulbGeometry, bulbMaterial);
+bulbMesh.position.copy(bulbLight.position);  // Align bulb mesh with the light position
+
+// Add both light and bulb mesh to the scene
+this.scene_.add(bulbLight);
+this.scene_.add(bulbMesh);
 
 
+// Add ambient light to fill shadows and enhance visibility
+const ambientLight = new THREE.AmbientLight(0xffffff, 0.4); // Adjust intensity as needed
+this.scene_.add(ambientLight);
 
 
 
@@ -830,34 +847,11 @@ loader.load('resources/night_city_cartoon.glb', (gltf) => {
     // this.scene_.add(bulbLight);
 
     // Ambient Light
-    const ambientLight = new THREE.AmbientLight(0x404040, 0.5); 
-    this.scene_.add(ambientLight);
+
 
     // Hemisphere Light
-    const hemiLight = new THREE.HemisphereLight(0xddeeff, 0x555555, 0.3); // Adjusted intensity
-    this.scene_.add(hemiLight);
 
-// Lightbulb-style Point Light setup
-const lightHeight = 20;  // Positioning 20 feet off the ground
-const lightIntensity = 12;  // High intensity for a bright effect
-const lightDistance = 100;  // Large radius to illuminate the scene
 
-// Create a PointLight for the "lightbulb" effect
-const bulbLight = new THREE.PointLight(0xffffff, lightIntensity, lightDistance, 2);  // Using decay of 2 for natural falloff
-bulbLight.position.set(0, lightHeight, 0);  // Positioning above the center of the scene
-bulbLight.castShadow = true;  // Enable shadows for a realistic look
-bulbLight.shadow.mapSize.width = 1024;  // Higher shadow map resolution for better quality
-bulbLight.shadow.mapSize.height = 1024;
-
-// Add a small sphere as a visual representation of the lightbulb
-const bulbGeometry = new THREE.SphereGeometry(0.5, 16, 8);
-const bulbMaterial = new THREE.MeshBasicMaterial({ color: 0xffffee });
-const bulbMesh = new THREE.Mesh(bulbGeometry, bulbMaterial);
-bulbMesh.position.copy(bulbLight.position);  // Align bulb mesh with the light position
-
-// Add both light and bulb mesh to the scene
-this.scene_.add(bulbLight);
-this.scene_.add(bulbMesh);
 
 
     // Create Box3 for each mesh in the scene so that we can
