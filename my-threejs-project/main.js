@@ -3,6 +3,8 @@ import Stats from 'https://cdn.skypack.dev/three@0.136.0/examples/jsm/libs/stats
 import { EXRLoader } from 'https://cdn.skypack.dev/three@0.136/examples/jsm/loaders/EXRLoader.js';
 import { Octree } from 'three/examples/jsm/math/Octree';
 import { Capsule } from 'three/examples/jsm/math/Capsule';
+import { GLTFLoader } from 'https://cdn.skypack.dev/three@0.136/examples/jsm/loaders/GLTFLoader.js';
+
 import { RectAreaLight } from 'three';
 import { RectAreaLightUniformsLib } from 'three/examples/jsm/lights/RectAreaLightUniformsLib.js';
 RectAreaLightUniformsLib.init();
@@ -662,6 +664,53 @@ class FirstPersonCameraDemo {
     // this.scene_.background = texture;
     // this.scene_.background = new THREE.Color(0xffffff);
 
+
+
+    const loader = new GLTFLoader();
+    // loader.load('/resources/Desk.glb', (gltf) => {
+    //   const desk = gltf.scene;
+    //   desk.position.set(0, 0, 0);  // Adjust position to suit the scene
+    //   desk.scale.set(3, 1.5, 3);     // Scale the model as needed
+    //   this.scene_.add(desk);
+    // },
+    // undefined,
+    // (error) => {
+    //   console.error('An error occurred loading the desk model:', error);
+    // });
+
+// Load and add the night city model in the background
+loader.load('resources/night_city_cartoon.glb', (gltf) => {
+  const city = gltf.scene;
+  
+  city.scale.set(10, 10, 10); // Scale up the city for visibility
+  city.position.set(0, -1, -50); // Position far back on the z-axis
+
+  // Optional: Rotate if needed to ensure correct orientation
+  city.rotation.y = Math.PI / 4; // Adjust rotation for best view angle
+  
+  this.scene_.add(city);
+});
+ // Load and add the chair next to the desk
+ loader.load('resources/Chair.glb', (gltf) => {
+  const chair = gltf.scene;
+  chair.scale.set(1, 1, 1); // Adjust scale if needed
+  chair.position.set(1, 0, 1); // Adjust position near the desk
+
+  this.scene_.add(chair);
+});
+
+
+
+
+
+
+
+
+
+
+
+
+
     const mapLoader = new THREE.TextureLoader();
     const maxAnisotropy = this.threejs_.capabilities.getMaxAnisotropy();
     // const checkerboard = mapLoader.load('resources/checkerboard.png');
@@ -790,7 +839,7 @@ class FirstPersonCameraDemo {
 
 // Lightbulb-style Point Light setup
 const lightHeight = 20;  // Positioning 20 feet off the ground
-const lightIntensity = 2;  // High intensity for a bright effect
+const lightIntensity = 12;  // High intensity for a bright effect
 const lightDistance = 100;  // Large radius to illuminate the scene
 
 // Create a PointLight for the "lightbulb" effect
@@ -842,15 +891,15 @@ this.scene_.add(bulbMesh);
     // const planeGeometry = new THREE.PlaneGeometry(4, 2.5); // Decrease height from 3 to 2.5 for a shorter screen
     const verticalOffset = 2;
 
-    // Wall behind the screens, now moved to the opposite side
-    const wallGeometry = new THREE.PlaneGeometry(15, 6);
-    const wallMaterial = new THREE.MeshStandardMaterial({
-        color: 0xff2222,
-        side: THREE.DoubleSide,
-    });
-    const wall = new THREE.Mesh(wallGeometry, wallMaterial);
-    wall.position.set(0, 2.8 + verticalOffset, -14);  // Adjusted to the opposite wall
-    this.scene_.add(wall);
+    // // Wall behind the screens, now moved to the opposite side
+    // const wallGeometry = new THREE.PlaneGeometry(15, 6);
+    // const wallMaterial = new THREE.MeshStandardMaterial({
+    //     color: 0xff2222,
+    //     side: THREE.DoubleSide,
+    // });
+    // const wall = new THREE.Mesh(wallGeometry, wallMaterial);
+    // wall.position.set(0, 2.8 + verticalOffset, -14);  // Adjusted to the opposite wall
+    // this.scene_.add(wall);
   
 //     // Arrange screens in a 3x2 grid with mounting brackets
     const rows = 2;
@@ -892,7 +941,7 @@ this.scene_.add(bulbMesh);
               frameDepth
           );
           const outerFrameMaterial = new THREE.MeshStandardMaterial({
-              color: 0x000000,
+              color: 0xfffff2,
               metalness: 0.5,
               roughness: 0.8,
           });
