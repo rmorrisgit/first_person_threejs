@@ -32,6 +32,13 @@ document.body.addEventListener('click', () => {
     document.body.requestPointerLock();  // Only request pointer lock if it's not active
   }
 });
+const textureLoader = new THREE.TextureLoader();
+const groundTexture = textureLoader.load('resources/laminate_floor_02_disp_2k.png');  // Replace with the path to your texture image
+
+// Set texture properties (optional)
+groundTexture.wrapS = THREE.RepeatWrapping;
+groundTexture.wrapT = THREE.RepeatWrapping;
+groundTexture.repeat.set(1, 1);  // Adjust for texture tiling
 
 
 class InputController {
@@ -457,6 +464,8 @@ if (this.translation_.y < this.groundLevel) {
 
 class FirstPersonCameraDemo {
   constructor() {    
+    this.segmentSize = 50;  // Size of each ground segment
+    this.groundSegments = new Map();  // Track existing ground segments
     this.cubeTextureLoader = new THREE.CubeTextureLoader();
     this.skyboxTexture = this.cubeTextureLoader.load([
       './resources/skybox/posx.jpg',
@@ -479,7 +488,31 @@ class FirstPersonCameraDemo {
     });
 
   }
+  addGroundSegment(x, z) {
+    // Check if a segment at this position already exists
+    const segmentKey = `${x},${z}`;
+    if (this.groundSegments.has(segmentKey)) return;
 
+    // Create ground segment geometry and material
+    const groundGeometry = new THREE.PlaneGeometry(this.segmentSize, this.segmentSize);
+    const groundMaterial = new THREE.MeshStandardMaterial({ color: 0x228b22 });
+    const groundSegment = new THREE.Mesh(groundGeometry, groundMaterial);
+    
+    // Position and rotate the segment
+    groundSegment.position.set(x, 0, z);
+    groundSegment.rotation.x = -Math.PI / 2;
+
+    // Add to the scene and track in Map
+    this.scene_.add(groundSegment);
+    this.groundSegments.set(segmentKey, groundSegment);
+  }
+
+
+
+
+
+
+  
   initialize_() {
     this.octree = new Octree();  // Initialize the octree here
     this.createSecondaryScenes_();  // Create secondary scenes and cameras first
@@ -514,7 +547,7 @@ class FirstPersonCameraDemo {
   
   initializeRenderer_() {
     this.threejs_ = new THREE.WebGLRenderer({
-      antialias: false,
+      antialias: true,
     });
     this.threejs_.shadowMap.enabled = true;
     this.threejs_.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -627,6 +660,7 @@ class FirstPersonCameraDemo {
 
     // texture.encoding = THREE.sRGBEncoding;
     // this.scene_.background = texture;
+    // this.scene_.background = new THREE.Color(0xffffff);
 
     const mapLoader = new THREE.TextureLoader();
     const maxAnisotropy = this.threejs_.capabilities.getMaxAnisotropy();
@@ -734,17 +768,17 @@ class FirstPersonCameraDemo {
 
 
     // Point Light
-    const bulbGeometry = new THREE.SphereGeometry(0.3, 26, 8);
-    const bulbMaterial = new THREE.MeshStandardMaterial({
+    // const bulbGeometry = new THREE.SphereGeometry(0.3, 26, 8);
+    // const bulbMaterial = new THREE.MeshStandardMaterial({
 
-        color: 0xff0000
-    });
+    //     color: 0xff0000
+    // });
 
-    const bulbLight = new THREE.PointLight(0xffee88, 1, 500, 1); // Adjusted distance and decay
-    bulbLight.add(new THREE.Mesh(bulbGeometry, bulbMaterial));
-    bulbLight.position.set(0, 3, 0);
-    bulbLight.castShadow = true;
-    this.scene_.add(bulbLight);
+    // const bulbLight = new THREE.PointLight(0xffee88, 1, 500, 1); // Adjusted distance and decay
+    // bulbLight.add(new THREE.Mesh(bulbGeometry, bulbMaterial));
+    // bulbLight.position.set(0, 3, 0);
+    // bulbLight.castShadow = true;
+    // this.scene_.add(bulbLight);
 
     // Ambient Light
     const ambientLight = new THREE.AmbientLight(0x404040, 0.5); 
@@ -754,7 +788,27 @@ class FirstPersonCameraDemo {
     const hemiLight = new THREE.HemisphereLight(0xddeeff, 0x555555, 0.3); // Adjusted intensity
     this.scene_.add(hemiLight);
 
+// Lightbulb-style Point Light setup
+const lightHeight = 20;  // Positioning 20 feet off the ground
+const lightIntensity = 2;  // High intensity for a bright effect
+const lightDistance = 100;  // Large radius to illuminate the scene
 
+// Create a PointLight for the "lightbulb" effect
+const bulbLight = new THREE.PointLight(0xffffff, lightIntensity, lightDistance, 2);  // Using decay of 2 for natural falloff
+bulbLight.position.set(0, lightHeight, 0);  // Positioning above the center of the scene
+bulbLight.castShadow = true;  // Enable shadows for a realistic look
+bulbLight.shadow.mapSize.width = 1024;  // Higher shadow map resolution for better quality
+bulbLight.shadow.mapSize.height = 1024;
+
+// Add a small sphere as a visual representation of the lightbulb
+const bulbGeometry = new THREE.SphereGeometry(0.5, 16, 8);
+const bulbMaterial = new THREE.MeshBasicMaterial({ color: 0xffffee });
+const bulbMesh = new THREE.Mesh(bulbGeometry, bulbMaterial);
+bulbMesh.position.copy(bulbLight.position);  // Align bulb mesh with the light position
+
+// Add both light and bulb mesh to the scene
+this.scene_.add(bulbLight);
+this.scene_.add(bulbMesh);
 
 
     // Create Box3 for each mesh in the scene so that we can
@@ -771,8 +825,6 @@ class FirstPersonCameraDemo {
     b.setFromObject(mesh);
     return b;
     });
-
-
 
     // Crosshair
     const crosshair = mapLoader.load('resources/crosshair.png');
@@ -803,124 +855,60 @@ class FirstPersonCameraDemo {
 //     // Arrange screens in a 3x2 grid with mounting brackets
     const rows = 2;
     const columns = 3;
-    const screenSpacingX = 3.8;  // Reduced spacing between screens horizontally
-    const screenSpacingY = 2.3;  // Reduced spacing between screens vertically
+    const screenSpacingX = 4.8;  // Reduced spacing between screens horizontally
+    const screenSpacingY = 3.3;  // Reduced spacing between screens vertically
+    const framePadding = 0.2;  // Extra padding for the frame around the screen
+    const frameDepth = 0.2;    // Thickness of the frame
+    const insetDepth = 0.05;   // Depth to position the screen within the frame
+
     this.viewingPlanes = [];
 
     for (let row = 0; row < rows; row++) {
-        for (let col = 0; col < columns; col++) {
-            const index = row * columns + col;
-            if (index >= this.renderTargets.length) break;
+      for (let col = 0; col < columns; col++) {
+          const index = row * columns + col;
+          if (index >= this.renderTargets.length) break;
 
-const planeGeometry = new THREE.PlaneGeometry(3.6, 2.2);
-const planeMaterial = new THREE.MeshBasicMaterial({
-    map: this.renderTargets[index].texture,  // Each plane uses its specific render target
-    polygonOffset: true,
-    polygonOffsetFactor: -0.1,
-    polygonOffsetUnits: -0.1,
-});
-const viewingPlane = new THREE.Mesh(planeGeometry, planeMaterial);
+          // Render target plane geometry and material
+          const planeGeometry = new THREE.PlaneGeometry(3.6, 2.2);
+          const planeMaterial = new THREE.MeshBasicMaterial({
+              map: this.renderTargets[index].texture,
+              polygonOffset: true,
+              polygonOffsetFactor: -0.1,
+              polygonOffsetUnits: -0.1,
+          });
+          const viewingPlane = new THREE.Mesh(planeGeometry, planeMaterial);
 
-  viewingPlane.position.set(
-      -screenSpacingX + col * screenSpacingX,
-      4 - row * screenSpacingY + verticalOffset,
-      -13.8  // Adjusted to position screens close to the opposite wall
-  );
-  viewingPlane.rotation.y = 0;  // Adjusted rotation to face the room center
+          // Position viewing plane in front of the frame
+          viewingPlane.position.set(
+              -screenSpacingX + col * screenSpacingX,
+              4 - row * screenSpacingY + verticalOffset,
+              -14 // Position plane closer to the wall
+          );
 
-//   // Bezel adjusted to match new screen height
-//   const bezelGeometry = new THREE.BoxGeometry(4.1, 2.6, 0.08); // Reduced height to match screen
-//   const bezelMaterial = new THREE.MeshStandardMaterial({
-//     color: 0xff000,
-//     depthTest: true,
-//     depthWrite: true,     // Ensure depth writing is enabled
-//     transparent: false,    // Disable transparency
-//     opacity: 1.0           // Full opacity
-// });
-//   const bezel = new THREE.Mesh(bezelGeometry, bezelMaterial);
-//   bezel.position.copy(viewingPlane.position);
-//   bezel.position.z -= 0.05;  // Move bezel outward
-//   bezel.rotation.copy(viewingPlane.rotation);
+          // Frame geometry and material
+          const outerFrameGeometry = new THREE.BoxGeometry(
+              planeGeometry.parameters.width + framePadding,
+              planeGeometry.parameters.height + framePadding,
+              frameDepth
+          );
+          const outerFrameMaterial = new THREE.MeshStandardMaterial({
+              color: 0x000000,
+              metalness: 0.5,
+              roughness: 0.8,
+          });
+          const outerFrame = new THREE.Mesh(outerFrameGeometry, outerFrameMaterial);
 
+          // Align the frame behind the viewing plane
+          outerFrame.position.copy(viewingPlane.position);
+          outerFrame.position.z -= frameDepth / 2 + insetDepth; // Move the frame slightly behind
 
+          // Add the viewing plane and frame to the scene
+          this.scene_.add(outerFrame);
+          this.scene_.add(viewingPlane);
 
-  const framePadding = 0.1; // Extra size for the bezel around the monitor
-  const frameDepth = 0.1; // Depth of the frame
-  
-  // Frame dimensions are slightly larger than the screen to create a visible bezel
-  const outerFrameGeometry = new THREE.BoxGeometry(
-    planeGeometry.parameters.width + framePadding,  // Width with padding
-    planeGeometry.parameters.height + framePadding, // Height with padding
-    frameDepth // Depth for visibility
-  );
-  
-  const outerFrameMaterial = new THREE.MeshStandardMaterial({
-    color: 0x000000,   // Dark frame color for contrast
-    metalness: 0.3,
-    roughness: 0.9,
-  });
-  
-  // Create the frame mesh and position it slightly in front of the viewing plane
-  const outerFrame = new THREE.Mesh(outerFrameGeometry, outerFrameMaterial);
-  outerFrame.position.copy(viewingPlane.position);
-  outerFrame.position.z -= frameDepth / 2 + 0.05; // Offset forward for visibility
-  outerFrame.rotation.copy(viewingPlane.rotation);
-  
-  // Add the frame to the scene
-  this.scene_.add(outerFrame);
-
-
-// // Brackets for mounting
-// const bracketGeometry = new THREE.BoxGeometry(0.06, 0.06, 0.3);  // Increased bracket size slightly
-// const bracketMaterial = new THREE.MeshStandardMaterial({ color: 0x666666 });
-
-
-// // Reduced offsets for a tighter fit on smaller screens
-// const bracketOffsetZ = -0.15; 
-// const bracketOffsetX = 0.9; 
-// const bracketOffsetY = 0.75;
-
-// // Top-left bracket
-// const bracket1 = new THREE.Mesh(bracketGeometry, bracketMaterial);
-// bracket1.position.set(
-//     viewingPlane.position.x - bracketOffsetX, 
-//     viewingPlane.position.y + bracketOffsetY, 
-//     viewingPlane.position.z + bracketOffsetZ
-// );
-
-// // Top-right bracket
-// const bracket2 = new THREE.Mesh(bracketGeometry, bracketMaterial);
-// bracket2.position.set(
-//     viewingPlane.position.x + bracketOffsetX, 
-//     viewingPlane.position.y + bracketOffsetY, 
-//     viewingPlane.position.z + bracketOffsetZ
-// );
-
-// // Bottom-left bracket
-// const bracket3 = new THREE.Mesh(bracketGeometry, bracketMaterial);
-// bracket3.position.set(
-//     viewingPlane.position.x - bracketOffsetX, 
-//     viewingPlane.position.y - bracketOffsetY, 
-//     viewingPlane.position.z + bracketOffsetZ
-// );
-
-// // Bottom-right bracket
-// const bracket4 = new THREE.Mesh(bracketGeometry, bracketMaterial);
-// bracket4.position.set(
-//     viewingPlane.position.x + bracketOffsetX, 
-//     viewingPlane.position.y - bracketOffsetY, 
-//     viewingPlane.position.z + bracketOffsetZ
-// );
-            // Add to the scene
-            this.scene_.add(viewingPlane);
-            const screenLight = new RectAreaLight(0x00aaff, .1, 4, 2.5); // Width and height match the monitor
-            screenLight.position.set(viewingPlane.position.x, viewingPlane.position.y, viewingPlane.position.z + 0.2);
-            screenLight.rotation.copy(viewingPlane.rotation); // Match screen rotation
-            this.scene_.add(screenLight);
-            // Track viewing planes for future reference
-            this.viewingPlanes.push(viewingPlane);
-          }
-    }
+          this.viewingPlanes.push(viewingPlane);
+      }
+  }
 }
 
 createSecondaryScenes_() {
@@ -993,9 +981,23 @@ createSecondaryScenes_() {
 
   step_(timeElapsed) {
     const timeElapsedS = timeElapsed * 0.001;
-
-    // this.controls_.update(timeElapsedS);
     this.fpsCamera_.update(timeElapsedS);
+
+    const playerPos = this.fpsCamera_.player_.getPosition();
+    const x = Math.floor(playerPos.x / this.segmentSize);
+    const z = Math.floor(playerPos.z / this.segmentSize);
+
+    this.generateSurroundingGround(x, z);
+  }
+
+  generateSurroundingGround(centerX, centerZ) {
+    for (let dx = -1; dx <= 1; dx++) {
+      for (let dz = -1; dz <= 1; dz++) {
+        const x = (centerX + dx) * this.segmentSize;
+        const z = (centerZ + dz) * this.segmentSize;
+        this.addGroundSegment(x, z);
+      }
+    }
   }
 }
 
