@@ -4,8 +4,8 @@ import { EXRLoader } from 'https://cdn.skypack.dev/three@0.136/examples/jsm/load
 import { Octree } from 'three/examples/jsm/math/Octree';
 import { Capsule } from 'three/examples/jsm/math/Capsule';
 import { GLTFLoader } from 'https://cdn.skypack.dev/three@0.136/examples/jsm/loaders/GLTFLoader.js';
-
 import { RectAreaLight } from 'three';
+import { RectAreaLightHelper } from 'three/examples/jsm/helpers/RectAreaLightHelper.js';
 import { RectAreaLightUniformsLib } from 'three/examples/jsm/lights/RectAreaLightUniformsLib.js';
 RectAreaLightUniformsLib.init();
 const KEYS = {
@@ -34,13 +34,6 @@ document.body.addEventListener('click', () => {
     document.body.requestPointerLock();  // Only request pointer lock if it's not active
   }
 });
-const textureLoader = new THREE.TextureLoader();
-const groundTexture = textureLoader.load('resources/laminate_floor_02_disp_2k.png');  // Replace with the path to your texture image
-
-// Set texture properties (optional)
-groundTexture.wrapS = THREE.RepeatWrapping;
-groundTexture.wrapT = THREE.RepeatWrapping;
-groundTexture.repeat.set(1, 1);  // Adjust for texture tiling
 
 
 class InputController {
@@ -471,24 +464,6 @@ class FirstPersonCameraDemo {
     });
 
   }
-  addGroundSegment(x, z) {
-    // Check if a segment at this position already exists
-    const segmentKey = `${x},${z}`;
-    if (this.groundSegments.has(segmentKey)) return;
-
-    // Create ground segment geometry and material
-    const groundGeometry = new THREE.PlaneGeometry(this.segmentSize, this.segmentSize);
-    const groundMaterial = new THREE.MeshStandardMaterial({ color: 0x228b22 });
-    const groundSegment = new THREE.Mesh(groundGeometry, groundMaterial);
-    
-    // Position and rotate the segment
-    groundSegment.position.set(x, 0, z);
-    groundSegment.rotation.x = -Math.PI / 2;
-
-    // Add to the scene and track in Map
-    this.scene_.add(groundSegment);
-    this.groundSegments.set(segmentKey, groundSegment);
-  }
 
   initialize_() {
     this.octree = new Octree();  // Initialize the octree here
@@ -621,100 +596,92 @@ class FirstPersonCameraDemo {
     console.error("Octree is not initialized!");
     return;
     }
-    //   const loader = new THREE.CubeTextureLoader();
-    //   const texture = loader.load([
-    //     './resources/skybox/posx.jpg',
-    //     './resources/skybox/negx.jpg',
-    //     './resources/skybox/posy.jpg',
-    //     './resources/skybox/negy.jpg',
-    //     './resources/skybox/posz.jpg',
-    //     './resources/skybox/negz.jpg',
-    // ]);
-    // texture.encoding = THREE.sRGBEncoding;
-    // this.scene_.background = texture;
-    // this.scene_.background = new THREE.Color(0xffffff);
+    const loader = new THREE.CubeTextureLoader();
+    const texture = loader.load([
+        'resources/skybox/Cold_Sunset__Cam_2_Left+X.png',   // Left (-X)
+        'resources/skybox/Cold_Sunset__Cam_3_Right-X.png',  // Right (+X)
+        'resources/skybox/Cold_Sunset__Cam_4_Up+Y.png',     // Top (+Y)
+        'resources/skybox/Cold_Sunset__Cam_5_Down-Y.png',   // Bottom (-Y)
+        'resources/skybox/Cold_Sunset__Cam_0_Front+Z.png',  // Front (+Z)
+        'resources/skybox/Cold_Sunset__Cam_1_Back-Z.png'    // Back (-Z)
+    ]);
+    texture.encoding = THREE.sRGBEncoding;
+    this.scene_.background = texture;
 
-    const hemiLight = new THREE.HemisphereLight(0xddeeff, 0x555555, 0.3); // Adjusted intensity
-    this.scene_.add(hemiLight);
-    // Lightbulb-style Point Light setup
-    const lightHeight = 20;  // Positioning 20 feet off the ground
-    const lightIntensity = 12;  // High intensity for a bright effect
-    const lightDistance = 100;  // Large radius to illuminate the scene
+// // Ceiling Light Setup with RectAreaLight (for broader ceiling lighting)
+// const rectLight = new THREE.RectAreaLight(0xffffff, 16, 5, 5); // color, intensity, width, height
+// rectLight.position.set(0, 6.88, 0); // Position it closer to the ceiling
+// rectLight.lookAt(0, 0, 0); // Aim light downwards
+// this.scene_.add(rectLight);
 
-    const loader = new GLTFLoader();
-
-    // Create a PointLight for the "lightbulb" effect
-    const bulbLight = new THREE.PointLight(0xffffff, lightIntensity, lightDistance, 2);  // Using decay of 2 for natural falloff
-    bulbLight.position.set(0, lightHeight, 0);  // Positioning above the center of the scene
-    bulbLight.castShadow = true;  // Enable shadows for a realistic look
-    bulbLight.shadow.mapSize.width = 1024;  // Higher shadow map resolution for better quality
-    bulbLight.shadow.mapSize.height = 1024;
-
-    // Add a small sphere as a visual representation of the lightbulb
-    const bulbGeometry = new THREE.SphereGeometry(0.5, 16, 8);
-    const bulbMaterial = new THREE.MeshBasicMaterial({ color: 0xffffee });
-    const bulbMesh = new THREE.Mesh(bulbGeometry, bulbMaterial);
-    bulbMesh.position.copy(bulbLight.position);  // Align bulb mesh with the light position
-
-    // Add both light and bulb mesh to the scene
-    this.scene_.add(bulbLight);
-    this.scene_.add(bulbMesh);
+// // Optional: Add a helper to visualize the RectAreaLight
+// const rectLightHelper = new RectAreaLightHelper(rectLight);
+// rectLight.add(rectLightHelper);
 
 
-    // Add ambient light to fill shadows and enhance visibility
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.4); // Adjust intensity as needed
-    this.scene_.add(ambientLight);
+const loader2 = new GLTFLoader();
+loader2.load('resources/ax222.glb', (gltf) => {
+    const model = gltf.scene;
+    this.scene_.add(model);
+    console.log("GLB Model loaded successfully");
 
-
-    const mapLoader = new THREE.TextureLoader();
-    const maxAnisotropy = this.threejs_.capabilities.getMaxAnisotropy();
-
-    // Load the textures
-    const diffuseMap = mapLoader.load('resources/laminate_floor_02_diff_2k.jpg');
-    const displacementMap = mapLoader.load('resources/laminate_floor_02_disp_2k.png');
-
-    // Load the .exr files for the normal and roughness maps
-    const normalMap = new EXRLoader().load('resources/laminate_floor_02_nor_gl_2k.exr');
-    const roughnessMap = new EXRLoader().load('resources/laminate_floor_02_rough_2k.exr');
-
-    // Set texture properties
-    diffuseMap.wrapS = diffuseMap.wrapT = THREE.RepeatWrapping;
-    displacementMap.wrapS = displacementMap.wrapT = THREE.RepeatWrapping;
-    normalMap.wrapS = normalMap.wrapT = THREE.RepeatWrapping;
-    roughnessMap.wrapS = roughnessMap.wrapT = THREE.RepeatWrapping;
-
-    // Adjust the repeat settings to make the pattern smaller
-    diffuseMap.repeat.set(20, 20);
-    normalMap.repeat.set(20, 20);
-    roughnessMap.repeat.set(20, 20);
-    displacementMap.repeat.set(20, 20);
-
-    // Create the material using the loaded textures
-    const floorMaterial = new THREE.MeshStandardMaterial({
-      map: diffuseMap,
-      displacementMap: displacementMap,
-      displacementScale: 0.05, // Adjust as necessary for depth
-      normalMap: normalMap,
-      roughnessMap: roughnessMap,
-      roughness: 1 // Adjust based on your needs
+    // Log all objects in the model to confirm structure if needed
+    model.traverse((object) => {
+        console.log("Object name:", object.name);
     });
-    // Apply the material to a plane geometry
-    const plane = new THREE.Mesh(
-      new THREE.PlaneGeometry(100, 100, 100, 100),  // More segments for displacement
-      floorMaterial 
-    );
-    // Set shadow and position properties
-    plane.castShadow = false;
-    plane.receiveShadow = true;
-    plane.rotation.x = -Math.PI / 2;
 
-    this.scene_.add(plane);
-    this.octree.fromGraphNode(plane);
-  
-    this.sceneObjects = [plane];
+    // Known lamp names from your Blender export
+    const ceilingLampNames = ['lampSquareCeiling', 'lampSquareCeiling001'];
+
+    // Loop through each ceiling lamp name and add a point light
+    ceilingLampNames.forEach((lampName) => {
+        const lamp = model.getObjectByName(lampName);
+        if (lamp) {
+            // Create a point light at the lamp's position
+            const pointLight = new THREE.PointLight(0xffffff, 3, 20); // Adjust intensity and distance as needed
+            pointLight.position.copy(lamp.position); // Set the light at the lamp's position
+            pointLight.castShadow = true;
+
+            // Move the light slightly downward
+            pointLight.position.y -= 0.2; // Adjust this value as necessary to lower the light
+
+            // Add the point light to the scene
+            this.scene_.add(pointLight);
+
+            // Optional: Add a helper to visualize each point light
+            const pointLightHelper = new THREE.PointLightHelper(pointLight, 0.3);
+            // this.scene_.add(pointLightHelper);
+
+            console.log(`Point light added at ${lampName} with adjusted position`, pointLight.position);
+        } else {
+            console.warn(`Lamp ${lampName} not found in model.`);
+        }
+    });
+}, undefined, (error) => {
+    console.error('Error loading GLB model:', error);
+});
+
+
+const mapLoader = new THREE.TextureLoader();
+const maxAnisotropy = this.threejs_.capabilities.getMaxAnisotropy();
+
+
+
+// Ambient and Hemisphere Lighting
+
+const ambientLight = new THREE.AmbientLight(0xffffff, 0.3);
+this.scene_.add(ambientLight);
+const hemiLight = new THREE.HemisphereLight(0xddeeff, 0x555555, 0.3);
+this.scene_.add(hemiLight);
+
+
+
+
+
+    this.sceneObjects = [];
 
     const meshes = [
-      plane];
+      ];
     this.objects_ = [];
 
     // You can still create bounding boxes if needed, but don't pass them to raycasting
@@ -732,93 +699,35 @@ class FirstPersonCameraDemo {
       new THREE.SpriteMaterial({map: crosshair, color: 0xffffff, fog: false, depthTest: false, depthWrite: false}));
       this.sprite_.scale.set(0.15, 0.15 * this.camera_.aspect, 1)
       this.sprite_.position.set(0, 0, -10);
-      this.createViewingPlanes_();
+      // this.createViewingPlanes_();
 
   }
-  createViewingPlanes_() {
-    const verticalOffset = 2;
-    // Arrange screens in a 3x2 grid with mounting brackets
-    const rows = 2;
-    const columns = 3;
-    const screenSpacingX = 4.8;  // Reduced spacing between screens horizontally
-    const screenSpacingY = 3.3;  // Reduced spacing between screens vertically
-    const framePadding = 0.2;  // Extra padding for the frame around the screen
-    const frameDepth = 0.2;    // Thickness of the frame
-    const insetDepth = 0.05;   // Depth to position the screen within the frame
-    this.viewingPlanes = [];
-    
-  for (let row = 0; row < rows; row++) {
-    for (let col = 0; col < columns; col++) {
-        const index = row * columns + col;
-        if (index >= this.renderTargets.length) break;
 
-        // Render target plane geometry and material
-        const planeGeometry = new THREE.PlaneGeometry(3.6, 2.2);
-        const planeMaterial = new THREE.MeshBasicMaterial({
-            map: this.renderTargets[index].texture,
-            polygonOffset: true,
-            polygonOffsetFactor: -0.1,
-            polygonOffsetUnits: -0.1,
-        });
-        const viewingPlane = new THREE.Mesh(planeGeometry, planeMaterial);
-
-        // Position viewing plane in front of the frame
-        viewingPlane.position.set(
-            -screenSpacingX + col * screenSpacingX,
-            4 - row * screenSpacingY + verticalOffset,
-            -14 // Position plane closer to the wall
-        );
-
-        // Frame geometry and material
-        const outerFrameGeometry = new THREE.BoxGeometry(
-            planeGeometry.parameters.width + framePadding,
-            planeGeometry.parameters.height + framePadding,
-            frameDepth
-        );
-        const outerFrameMaterial = new THREE.MeshStandardMaterial({
-            color: 0xfffff2,
-            metalness: 0.5,
-            roughness: 0.8,
-        });
-        const outerFrame = new THREE.Mesh(outerFrameGeometry, outerFrameMaterial);
-
-        // Align the frame behind the viewing plane
-        outerFrame.position.copy(viewingPlane.position);
-        outerFrame.position.z -= frameDepth / 2 + insetDepth; // Move the frame slightly behind
-
-        // Add the viewing plane and frame to the scene
-        this.scene_.add(outerFrame);
-        this.scene_.add(viewingPlane);
-
-        this.viewingPlanes.push(viewingPlane);
-      }
-    }
-  }
 
   createSecondaryScenes_() {
     this.sharedScene = new THREE.Scene();
-    this.sharedScene.background = this.skyboxTexture; // Skybox texture only for the secondary scene
+    this.sharedScene.background = this.skyboxTexture;
 
-    // Set up secondary cameras and render targets
     this.secondaryCameras = [];
     this.renderTargets = [];
     const cameraSettings = { fov: 45, aspect: 1, near: 0.1, far: 500 };
 
+    // Set up secondary cameras and render targets for each screen
     for (let i = 0; i < 6; i++) {
-      const camera = new THREE.PerspectiveCamera(cameraSettings.fov, cameraSettings.aspect, cameraSettings.near, cameraSettings.far);
-      camera.position.set(0, 5, 10 * (i + 1));
-      camera.lookAt(0, 0, 0);
+        const camera = new THREE.PerspectiveCamera(cameraSettings.fov, cameraSettings.aspect, cameraSettings.near, cameraSettings.far);
+        camera.position.set(0, 5, 10 * (i + 1));
+        camera.lookAt(0, 0, 0);
 
-      const renderTarget = new THREE.WebGLRenderTarget(256, 256);
-      renderTarget.texture.minFilter = THREE.LinearFilter;
-      renderTarget.texture.generateMipmaps = false;
-      renderTarget.texture.encoding = THREE.sRGBEncoding;
+        const renderTarget = new THREE.WebGLRenderTarget(256, 256);
+        renderTarget.texture.minFilter = THREE.LinearFilter;
+        renderTarget.texture.generateMipmaps = false;
+        renderTarget.texture.encoding = THREE.sRGBEncoding;
 
-      this.secondaryCameras.push(camera);
-      this.renderTargets.push(renderTarget);
+        this.secondaryCameras.push(camera);
+        this.renderTargets.push(renderTarget);
     }
 
-    // Add specific objects to sharedScene (not main scene)
+    // Add floor and ambient light to the shared scene
     const mapLoader = new THREE.TextureLoader();
     const floorTexture = mapLoader.load('resources/concrete_floor_worn_001_rough_2k.jpg');
     floorTexture.wrapS = floorTexture.wrapT = THREE.RepeatWrapping;
@@ -828,10 +737,53 @@ class FirstPersonCameraDemo {
     floor.rotation.x = -Math.PI / 2;
     this.sharedScene.add(floor);
 
-    // Add lights, walls, and objects specific to sharedScene here
     const ambientLight = new THREE.AmbientLight(0xffffff, 0.3);
     this.sharedScene.add(ambientLight);
-  }
+    const loader = new GLTFLoader();
+    loader.load('resources/ax222.glb', (gltf) => {
+        const model = gltf.scene;
+    
+        // Define monitor and screen names based on the structure
+        const monitorNames = [
+            'computerScreen006', 'computerScreen001', 'computerScreen002',
+            'computerScreen003', 'computerScreen004', 'computerScreen005'
+        ];
+        const screenNames = [
+            'Screen1_Plane006', 'Screen1_Plane001', 'Screen1_Plane002',
+            'Screen1_Plane003', 'Screen1_Plane004', 'Screen1_Plane005'
+        ];
+    
+        monitorNames.forEach((monitorName, i) => {
+            const monitor = model.getObjectByName(monitorName);
+    
+            if (monitor) {
+                // Attempt to find the screen within each monitor
+                const screen = monitor.getObjectByName(screenNames[i]);
+                if (screen) {
+                    // Apply the render target to the screen
+                    this.renderTargets[i].texture.flipY = false;
+                    screen.material = new THREE.MeshBasicMaterial({
+                        map: this.renderTargets[i].texture,
+                        side: THREE.DoubleSide,
+                    });
+                    console.log(`Applied render target to ${screenNames[i]} on ${monitorName}`);
+                } else {
+                    console.error(`Screen ${screenNames[i]} not found in ${monitorName}`);
+                }
+            } else {
+                console.error(`${monitorName} not found in model`);
+            }
+        });
+    
+        // Add the entire model to the scene, preserving Blender's original positions
+        this.scene_.add(model);
+    }, undefined, (error) => {
+        console.error('Error loading monitor model:', error);
+    });
+    
+    
+
+  }    
 
   raf_() {
     requestAnimationFrame((t) => {
@@ -871,18 +823,9 @@ class FirstPersonCameraDemo {
     const x = Math.floor(playerPos.x / this.segmentSize);
     const z = Math.floor(playerPos.z / this.segmentSize);
 
-    this.generateSurroundingGround(x, z);
   }
 
-  generateSurroundingGround(centerX, centerZ) {
-    for (let dx = -1; dx <= 1; dx++) {
-      for (let dz = -1; dz <= 1; dz++) {
-        const x = (centerX + dx) * this.segmentSize;
-        const z = (centerZ + dz) * this.segmentSize;
-        this.addGroundSegment(x, z);
-      }
-    }
-  }
+
 }
 
 
