@@ -153,9 +153,12 @@ class InputController {
 };
 
 class Player {
-  constructor(scene, octree) {
+  constructor(scene, octree, doorOctree, firstPersonCamera) { // Add firstPersonCamera
     this.scene = scene;
     this.octree = octree;
+    this.doorOctree = doorOctree; // Assign doorOctree here
+    this.firstPersonCamera = firstPersonCamera;  // Store the camera instance
+
     this.position = new THREE.Vector3(0, 2, 0); // Initial player position
     this.groundLevel = this.position.y; // Set default ground level
 
@@ -173,7 +176,23 @@ class Player {
   }
 
   handleCollision(velocity) {
-    const result = this.octree.capsuleIntersect(this.capsule);
+    let result = null;  // Use let instead of const
+
+    // Check for collision with the main octree
+    if (this.octree) {
+      result = this.octree.capsuleIntersect(this.capsule);
+    }
+  
+ 
+  // Check door collision only if the door is closed
+  if (this.firstPersonCamera && !this.firstPersonCamera.checkIfDoorIsOpen() && this.doorOctree) {
+    const doorResult = this.doorOctree.capsuleIntersect(this.capsule);
+    if (doorResult && (!result || doorResult.depth > result.depth)) {
+      result = doorResult;
+      console.log("Collision detected with door.");
+    }
+  }
+
 
     if (result) {
         const normalComponent = result.normal.dot(velocity);
@@ -237,11 +256,13 @@ class Player {
 let hasKeycard = false;
 
 class FirstPersonCamera {
-  constructor(camera, player, objects, sceneObjects, scene, octree) {
+  constructor(camera, player, objects, sceneObjects, scene, octree, doorOctree) {  // Add doorOctree here
   this.camera_ = camera;
   this.input_ = new InputController(); 
   this.octree = octree; // Use the octree
+  this.doorOctree = doorOctree;
   this.player_ = player; // Now passing in the player object directly
+  this.isDoorOpen = false; // Keep the boolean property name as is
 
   this.rotation_ = new THREE.Quaternion();
   this.baseHeight = 2; // Set the base height here (adjustable)
@@ -282,7 +303,99 @@ class FirstPersonCamera {
   // }, undefined, (error) => {
   //   console.error('An error occurred while loading the audio file:', error);
   // });
+
+
+
+
 }
+
+checkIfDoorIsOpen() { // Rename the method
+  return this.isDoorOpen; // Return the property
+}
+
+initializeKeycardAndDoor(handle, door, keycard, wiggleAction, doorAction) {
+  this.handle = handle;
+  this.door = door;
+  this.keycard = keycard;
+  this.wiggleAction = wiggleAction;
+  this.doorAction = doorAction;
+  this.doorOpen = false; // Rename the boolean property
+
+  // Ensure door action is non-looping and clamps at the final frame
+  if (this.doorAction) {
+    this.doorAction.loop = THREE.LoopOnce;
+    this.doorAction.clampWhenFinished = true;
+  }
+
+  // Track the door’s open/closed state
+
+  // Set the initial state of the door to closed
+  if (this.doorAction) {
+    this.doorAction.reset();
+    this.doorAction.time = 0; // Set to start of animation (closed)
+    this.doorAction.stop();   // Prevent it from running initially
+  }
+
+  // Keycard pickup event listener
+  window.addEventListener('click', () => {
+    if (!this.keycard) {
+      console.warn("Keycard object not found. Check your keycard setup.");
+      return;
+    }
+
+    const centerScreen = new THREE.Vector2(0, 0);
+    this.raycaster.setFromCamera(centerScreen, this.camera_);
+    const intersects = this.raycaster.intersectObject(this.keycard, true);
+
+    if (intersects.length > 0 && !hasKeycard) {
+      hasKeycard = true;
+      this.keycard.visible = false;  // Hide keycard on pickup
+      console.log("Keycard collected! Door interaction enabled.");
+    }
+  });
+
+  // Door interaction event listener
+  window.addEventListener('click', () => {
+    if (!this.handle || !this.door) {
+      console.warn("Handle or door object not found. Check your setup.");
+      return;
+    }
+
+    const centerScreen = new THREE.Vector2(0, 0);
+    this.raycaster.setFromCamera(centerScreen, this.camera_);
+    const intersects = this.raycaster.intersectObject(this.handle, true);
+
+    if (intersects.length > 0) {
+      // Trigger wiggle animation on handle click
+      if (this.wiggleAction && !this.wiggleAction.isRunning()) {
+        this.wiggleAction.reset();
+        this.wiggleAction.play();
+        console.log("Handle wiggle animation triggered.");
+      }
+
+      if (hasKeycard && this.doorAction) {
+        if (!this.isDoorOpen) {
+          this.doorAction.reset();
+          this.doorAction.timeScale = 1;
+          this.doorAction.play();
+          this.isDoorOpen = true;  // Set door as open, disabling door collisions
+          console.log("Door opened.");
+        } else {
+          this.doorAction.timeScale = -1;
+          this.doorAction.paused = false;
+          this.doorAction.play();
+          this.isDoorOpen = false;  // Set door as closed, enabling door collisions
+          console.log("Door closed.");
+        }
+      } else if (!hasKeycard) {
+        console.log("You need the keycard to open this door!");
+      }
+    }
+  });
+}
+
+
+
 
   update(timeElapsedS) {
     this.updateRotation_(timeElapsedS);
@@ -479,8 +592,7 @@ class FirstPersonCamera {
 
 class FirstPersonCameraDemo {
   constructor() {    
-    this.segmentSize = 50;  // Size of each ground segment
-    this.groundSegments = new Map();  // Track existing ground segments
+
     this.cubeTextureLoader = new THREE.CubeTextureLoader();
     this.skyboxTexture = this.cubeTextureLoader.load([
       './resources/skybox/posx.jpg',
@@ -506,15 +618,18 @@ class FirstPersonCameraDemo {
 
   initialize_() {
     this.octree = new Octree();  // Initialize the octree here
+    this.doorOctree = new Octree(); // Separate octree for the door
+
     this.createSecondaryScenes_();  // Create secondary scenes and cameras first
     this.initializeScene_();
     // this.initializeLights_();
-
-    this.player_ = new Player(this.scene_, this.octree); // Make sure this is created first
-
     this.inputController = new InputController(document.body);
+    this.player_ = new Player(this.scene_, this.octree, this.doorOctree, this.fpsCamera_);
 
-    this.fpsCamera_ = new FirstPersonCamera(this.camera_,  this.player_, this.objects_, this.sceneObjects, this.scene_, this.octree);
+    this.fpsCamera_ = new FirstPersonCamera(this.camera_, this.player_, this.objects_, this.sceneObjects, this.scene_, this.octree, this.doorOctree);
+
+    // Now assign fpsCamera_ to player explicitly
+    this.player_.firstPersonCamera = this.fpsCamera_;
 
     this.initStats();
  
@@ -522,8 +637,68 @@ class FirstPersonCameraDemo {
     this.raf_();
     this.onWindowResize_();
 
-  }
+// Load models after fpsCamera_ is set up
+this.loadModels_();
+}
 
+loadModels_() {
+  // Load the door model
+  const loader2 = new GLTFLoader();
+  loader2.load('resources/GreyDoor.glb', (gltf) => {
+    const model = gltf.scene;
+    model.scale.set(4, 1.9, 2);
+    model.position.set(5.5, -0.2, -5.9);
+    this.scene_.add(model);
+
+    // Add each child mesh of the door to the separate door octree
+    model.traverse((child) => {
+      if (child.isMesh) {
+        this.doorOctree.fromGraphNode(child);
+      }
+    });
+
+    console.log("Door added to the octree for collision detection.");
+    this.mixer = new THREE.AnimationMixer(model);
+
+    // Get handle and door animations
+    const handle = model.getObjectByName('handle');
+    const wiggleAnimationIndex = 3;
+    const openAnimationIndex = 8;
+
+    const wiggleAction = gltf.animations[wiggleAnimationIndex] ? this.mixer.clipAction(gltf.animations[wiggleAnimationIndex]) : null;
+    const doorAction = gltf.animations[openAnimationIndex] ? this.mixer.clipAction(gltf.animations[openAnimationIndex]) : null;
+
+    if (wiggleAction) wiggleAction.loop = THREE.LoopOnce;
+    if (doorAction) doorAction.loop = THREE.LoopOnce;
+
+    // Add handle to sceneObjects for detection
+    if (handle) {
+      this.sceneObjects.push(handle);
+      console.log("Handle added to sceneObjects for detection.");
+    } else {
+      console.error("Handle not found in the model.");
+    }
+
+    // Load the keycard model after the door is loaded
+    const loader = new GLTFLoader();
+    loader.load('resources/monmon33.glb', (gltf) => {
+      const monmonModel = gltf.scene;
+      this.scene_.add(monmonModel);
+
+      const keycardObject = monmonModel.getObjectByName('RootNode');
+      if (keycardObject) {
+        if (this.fpsCamera_) {
+          this.fpsCamera_.initializeKeycardAndDoor(handle, model, keycardObject, wiggleAction, doorAction);
+          console.log("Keycard initialized:", keycardObject);
+        } else {
+          console.error("fpsCamera_ is not initialized when trying to call initializeKeycardAndDoor.");
+        }
+      } else {
+        console.error("Keycard object 'RootNode' not found in monmon33.");
+      }
+    });
+  });
+}
 
   onPointerLockChange_() {
     if (document.pointerLockElement === document.body) {
@@ -579,48 +754,6 @@ this.scene_.add(pointLightHelper);
 // Load the door model with animations
 // Load the door model with animations
 // Load the door model with animations
-const loader2 = new GLTFLoader();
-loader2.load('resources/GreyDoor.glb', (gltf) => {
-  const model = gltf.scene;
-
-  model.scale.set(4, 1.9, 2); // Adjust values as needed for your scale
-  model.position.set(5.5, -.2, -5.9); // Adjust values as needed for your scale
-  this.scene_.add(model);
-
-
-    // Add each child mesh of the door to the octree for collision detection
-  model.traverse((child) => {
-    if (child.isMesh) {
-      this.octree.fromGraphNode(child);
-    }
-  });
-
-
-// Create a bounding box and compute its size
-const boundingBox = new THREE.Box3().setFromObject(model);
-const doorSize = new THREE.Vector3();
-boundingBox.getSize(doorSize);
-
-console.log("Door dimensions (width x height x depth):", doorSize.x, doorSize.y, doorSize.z);
-  // Set up Animation Mixer and locate handle
-  this.mixer = new THREE.AnimationMixer(model);
-  const handle = model.getObjectByName('handle');
-  const wiggleAnimationIndex = 3;
-
-  if (gltf.animations[wiggleAnimationIndex]) {
-    const wiggleAction = this.mixer.clipAction(gltf.animations[wiggleAnimationIndex]);
-    wiggleAction.loop = THREE.LoopOnce;
-    this.fpsCamera_.initializeHandleWiggle(handle, wiggleAction);
-  } else {
-    console.error("Wiggle animation not found.");
-  }
-
-  // Add the handle to sceneObjects for raycasting
-  if (handle) {
-    this.sceneObjects.push(handle);  // Ensures handle is part of raycasting checks
-    console.log("Handle added to sceneObjects for detection.");
-  }
-});
 
 
 const mapLoader = new THREE.TextureLoader();
@@ -784,7 +917,7 @@ this.scene_.add(hemiLight);
         this.secondaryCameras.push(camera);
         this.renderTargets.push(renderTarget);
     }
-
+// Flag to ensure monmon33.glb loads only once
     // Add floor and ambient light to the shared scene
     const mapLoader = new THREE.TextureLoader();
     const floorTexture = mapLoader.load('resources/concrete_floor_worn_001_rough_2k.jpg');
@@ -803,7 +936,27 @@ this.scene_.add(hemiLight);
         model.traverse((child) => {
           console.log("Object:", child.name);  // This will log all object names within the model
       });
-  
+  // Load monmon33.glb if not already loaded
+
+
+   // Look for the keycard (RootNode) within monmon33
+   const keycardObject = model.getObjectByName('RootNode');
+   if (keycardObject) {
+     console.log("Keycard initialized:", keycardObject);
+     keycardObject.visible = false;
+
+   } else {
+     console.error("Keycard object 'RootNode' not found in monmon33.");
+   }
+
+
+
+
+
+
+
+
+
         // Define monitor and screen names based on the structure
         const monitorNames = [
             'computerScreen006', 'computerScreen001', 'computerScreen002',
