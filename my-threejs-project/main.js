@@ -4,10 +4,17 @@ import { EXRLoader } from 'https://cdn.skypack.dev/three@0.136/examples/jsm/load
 import { Octree } from 'three/examples/jsm/math/Octree';
 import { Capsule } from 'three/examples/jsm/math/Capsule';
 import { GLTFLoader } from 'https://cdn.skypack.dev/three@0.136/examples/jsm/loaders/GLTFLoader.js';
+
+
+
+import { DecalGeometry } from 'https://cdn.skypack.dev/three@0.136/examples/jsm/geometries/DecalGeometry.js';
+
 import { RectAreaLight } from 'three';
 import { RectAreaLightHelper } from 'three/examples/jsm/helpers/RectAreaLightHelper.js';
 import { RectAreaLightUniformsLib } from 'three/examples/jsm/lights/RectAreaLightUniformsLib.js';
 RectAreaLightUniformsLib.init();
+
+
 const KEYS = {
   'a': 65,
   's': 83,
@@ -227,6 +234,7 @@ class Player {
   }
 }
 
+let hasKeycard = false;
 
 class FirstPersonCamera {
   constructor(camera, player, objects, sceneObjects, scene, octree) {
@@ -242,12 +250,13 @@ class FirstPersonCamera {
   this.phiSpeed_ = 8;
   this.theta_ = 0;
   this.thetaSpeed_ = 5;
-  this.moveSpeed_ = 20; // Adjust this value for movement speed
+  this.moveSpeed_= 7; // Adjust this value for movement speed
   this.lookSpeed_ = 5;  // Adjust this value for look speed
   this.headBobActive_ = false;
   this.headBobTimer_ = 0;
   this.headBobSpeed_ = 12;
   this.headBobHeight_ = .13;
+  this.raycaster = new THREE.Raycaster(); // Store a single raycaster instance
 
   this.isSprinting = false; // State for sprinting
   this.sprintTimeout = false; // Sprint timeout state
@@ -256,7 +265,7 @@ class FirstPersonCamera {
   this.velocity = new THREE.Vector3(0, 0, 0); // 3D vector for velocity
   this.gravity = -64; // Gravity constant
   this.verticalVelocity = 0; // Current vertical speed
-  this.jumpHeight = 6; // Max height of the jump
+  this.jumpHeight = 2; // Max height of the jump
   this.groundLevel = this.baseHeight; // Set the ground level to the base height
   this.objects_ = objects;
   this.sceneObjects = sceneObjects || [];     // Audio listener setup
@@ -280,6 +289,7 @@ class FirstPersonCamera {
     this.updateCamera_(timeElapsedS);
     this.updateTranslation_(timeElapsedS);
     this.updateHeadBob_(timeElapsedS);
+    this.addDecal_();        // Check and add decals on mouse click
 
     // You can access the player's position like this:
     // const playerPosition = this.player_.getPosition();
@@ -287,7 +297,20 @@ class FirstPersonCamera {
 
     this.input_.update(timeElapsedS);
   }
-
+  addDecal_() {
+    if (this.input_.current_.leftButton && !this.input_.previous_.leftButton) {
+      const centerScreen = new THREE.Vector2(0, 0);
+      this.raycaster.setFromCamera(centerScreen, this.camera_);
+      const hits = this.raycaster.intersectObjects(this.sceneObjects);
+  
+      if (hits.length > 0) {
+        // Only trigger if animation is not already playing
+        if (this.wiggleAction && !this.wiggleAction.isRunning) {
+          this.wiggleAction.reset();
+          this.wiggleAction.play();
+        }
+      }
+    }}
   updateCamera_(_) {
     this.camera_.quaternion.copy(this.rotation_);
     this.camera_.position.copy(this.translation_);
@@ -417,7 +440,23 @@ class FirstPersonCamera {
     //   this.headBobActive_ = false; // Disable head bobbing when not moving
 
   }
+  initializeHandleWiggle(handle, wiggleAction) {
+    this.handle = handle;
+    this.wiggleAction = wiggleAction;
 
+    window.addEventListener('click', () => {
+      const centerScreen = new THREE.Vector2(0, 0); // Center coordinates
+      this.raycaster.setFromCamera(centerScreen, this.camera_);
+      const intersects = this.raycaster.intersectObject(this.handle, true);
+
+      if (intersects.length > 0 && this.wiggleAction) {
+        this.wiggleAction.reset();
+        this.wiggleAction.play(); // Play the wiggle animation on detection
+        console.log("Handle wiggle animation triggered at center.");
+      }
+    });
+  }
+  
   updateRotation_(timeElapsedS) {
     const xh = this.input_.current_.mouseXDelta / window.innerWidth;
     const yh = this.input_.current_.mouseYDelta / window.innerHeight;
@@ -495,7 +534,138 @@ class FirstPersonCameraDemo {
       showInstructions();  // Show instructions when pointer lock is disabled
     }
   }
+  initializeScene_() {
+    this.sharedSceneDirectionalLight = new THREE.DirectionalLight(0xffffff, 0.6);
+    this.sharedSceneDirectionalLight.position.set(10, 20, 10);
+    this.sharedSceneDirectionalLight.castShadow = true;
+    this.sharedScene.add(this.sharedSceneDirectionalLight);
+
+    // Octree must be initialized before adding objects to it
+    if (!this.octree) {
+    console.error("Octree is not initialized!");
+    return;
+    }
+    const loader = new THREE.CubeTextureLoader();
+    const texture = loader.load([
+        'resources/skybox/Cold_Sunset__Cam_2_Left+X.png',   // Left (-X)
+        'resources/skybox/Cold_Sunset__Cam_3_Right-X.png',  // Right (+X)
+        'resources/skybox/Cold_Sunset__Cam_4_Up+Y.png',     // Top (+Y)
+        'resources/skybox/Cold_Sunset__Cam_5_Down-Y.png',   // Bottom (-Y)
+        'resources/skybox/Cold_Sunset__Cam_0_Front+Z.png',  // Front (+Z)
+        'resources/skybox/Cold_Sunset__Cam_1_Back-Z.png'    // Back (-Z)
+    ]);
+    texture.encoding = THREE.sRGBEncoding;
+    this.scene_.background = texture;
+
+// Ceiling Light Setup with RectAreaLight (for broader ceiling lighting)
+const xOffset = -3; // Horizontal offset to position the light across the X-axis
+const yOffset = 3;  // Additional vertical offset to position it near the ceiling
+const zOffset = -4; // Offset to move the light along the Z-axis
+
+// Point Light Setup
+const pointLight = new THREE.PointLight(0xffffff, 3, 50);
+pointLight.position.set(xOffset, 1 + yOffset, zOffset);
+this.scene_.add(pointLight);
+const pointLightHelper = new THREE.PointLightHelper(pointLight, 0.5);
+this.scene_.add(pointLightHelper);
+
+
+// Define specific offsets to adjust RectAreaLight positions independently for each window
+// Define specific offsets to adjust RectAreaLight positions independently for each window
+    // Load the door model with animations
+  // Load the door model with animations
+  // Load the door model with animations
+ // Load the door model with animations
+// Load the door model with animations
+// Load the door model with animations
+// Load the door model with animations
+const loader2 = new GLTFLoader();
+loader2.load('resources/GreyDoor.glb', (gltf) => {
+  const model = gltf.scene;
+
+  model.scale.set(4, 1.9, 2); // Adjust values as needed for your scale
+  model.position.set(5.5, -.2, -5.9); // Adjust values as needed for your scale
+  this.scene_.add(model);
+
+
+    // Add each child mesh of the door to the octree for collision detection
+  model.traverse((child) => {
+    if (child.isMesh) {
+      this.octree.fromGraphNode(child);
+    }
+  });
+
+
+// Create a bounding box and compute its size
+const boundingBox = new THREE.Box3().setFromObject(model);
+const doorSize = new THREE.Vector3();
+boundingBox.getSize(doorSize);
+
+console.log("Door dimensions (width x height x depth):", doorSize.x, doorSize.y, doorSize.z);
+  // Set up Animation Mixer and locate handle
+  this.mixer = new THREE.AnimationMixer(model);
+  const handle = model.getObjectByName('handle');
+  const wiggleAnimationIndex = 3;
+
+  if (gltf.animations[wiggleAnimationIndex]) {
+    const wiggleAction = this.mixer.clipAction(gltf.animations[wiggleAnimationIndex]);
+    wiggleAction.loop = THREE.LoopOnce;
+    this.fpsCamera_.initializeHandleWiggle(handle, wiggleAction);
+  } else {
+    console.error("Wiggle animation not found.");
+  }
+
+  // Add the handle to sceneObjects for raycasting
+  if (handle) {
+    this.sceneObjects.push(handle);  // Ensures handle is part of raycasting checks
+    console.log("Handle added to sceneObjects for detection.");
+  }
+});
+
+
+const mapLoader = new THREE.TextureLoader();
+const maxAnisotropy = this.threejs_.capabilities.getMaxAnisotropy();
+
+
+
+// Ambient and Hemisphere Lighting
+
+const ambientLight = new THREE.AmbientLight(0xffffff, 0.3);
+this.scene_.add(ambientLight);
+const hemiLight = new THREE.HemisphereLight(0xddeeff, 0x555555, 0.3);
+this.scene_.add(hemiLight);
+
+
+
+
+
+    this.sceneObjects = [];
+
+    const meshes = [
+      ];
+    this.objects_ = [];
+
+    // You can still create bounding boxes if needed, but don't pass them to raycasting
+    const boundingBoxes = meshes.map(mesh => {
+      const b = new THREE.Box3();
+      b.setFromObject(mesh);
+      return b;
+      });
+
+      // Crosshair
+      const crosshair = mapLoader.load('resources/ui/crosshair.png');
+      crosshair.anisotropy = maxAnisotropy;
   
+      this.sprite_ = new THREE.Sprite(
+        new THREE.SpriteMaterial({map: crosshair, color: 0xffffff, fog: false, depthTest: false, depthWrite: false}));
+      this.sprite_.scale.set(0.15, 0.15 * this.camera_.aspect, 1)
+      this.sprite_.position.set(0, 0, -10);
+  
+      this.uiScene_.add(this.sprite_);
+
+      // this.createViewingPlanes_();
+
+  }
   initializeRenderer_() {
     this.threejs_ = new THREE.WebGLRenderer({
       antialias: true,
@@ -522,7 +692,9 @@ class FirstPersonCameraDemo {
 
     this.scene_ = new THREE.Scene();
 
-
+    this.uiCamera_ = new THREE.OrthographicCamera(
+      -1, 1, 1 * aspect, -1 * aspect, 1, 1000);
+  this.uiScene_ = new THREE.Scene();
   }
 
   // Initialize FPS stats
@@ -540,7 +712,9 @@ class FirstPersonCameraDemo {
   onWindowResize_() {
     this.camera_.aspect = window.innerWidth / window.innerHeight;
     this.camera_.updateProjectionMatrix();
-
+    this.uiCamera_.left = -this.camera_.aspect;
+    this.uiCamera_.right = this.camera_.aspect;
+    this.uiCamera_.updateProjectionMatrix();
     this.threejs_.setSize(window.innerWidth, window.innerHeight);
   }
 
@@ -585,123 +759,7 @@ class FirstPersonCameraDemo {
 
 
 
-  initializeScene_() {
-    this.sharedSceneDirectionalLight = new THREE.DirectionalLight(0xffffff, 0.6);
-    this.sharedSceneDirectionalLight.position.set(10, 20, 10);
-    this.sharedSceneDirectionalLight.castShadow = true;
-    this.sharedScene.add(this.sharedSceneDirectionalLight);
-
-    // Octree must be initialized before adding objects to it
-    if (!this.octree) {
-    console.error("Octree is not initialized!");
-    return;
-    }
-    const loader = new THREE.CubeTextureLoader();
-    const texture = loader.load([
-        'resources/skybox/Cold_Sunset__Cam_2_Left+X.png',   // Left (-X)
-        'resources/skybox/Cold_Sunset__Cam_3_Right-X.png',  // Right (+X)
-        'resources/skybox/Cold_Sunset__Cam_4_Up+Y.png',     // Top (+Y)
-        'resources/skybox/Cold_Sunset__Cam_5_Down-Y.png',   // Bottom (-Y)
-        'resources/skybox/Cold_Sunset__Cam_0_Front+Z.png',  // Front (+Z)
-        'resources/skybox/Cold_Sunset__Cam_1_Back-Z.png'    // Back (-Z)
-    ]);
-    texture.encoding = THREE.sRGBEncoding;
-    this.scene_.background = texture;
-
-// // Ceiling Light Setup with RectAreaLight (for broader ceiling lighting)
-// const rectLight = new THREE.RectAreaLight(0xffffff, 16, 5, 5); // color, intensity, width, height
-// rectLight.position.set(0, 6.88, 0); // Position it closer to the ceiling
-// rectLight.lookAt(0, 0, 0); // Aim light downwards
-// this.scene_.add(rectLight);
-
-// // Optional: Add a helper to visualize the RectAreaLight
-// const rectLightHelper = new RectAreaLightHelper(rectLight);
-// rectLight.add(rectLightHelper);
-
-
-const loader2 = new GLTFLoader();
-loader2.load('resources/ax222.glb', (gltf) => {
-    const model = gltf.scene;
-    this.scene_.add(model);
-    console.log("GLB Model loaded successfully");
-
-    // Log all objects in the model to confirm structure if needed
-    model.traverse((object) => {
-        console.log("Object name:", object.name);
-    });
-
-    // Known lamp names from your Blender export
-    const ceilingLampNames = ['lampSquareCeiling', 'lampSquareCeiling001'];
-
-    // Loop through each ceiling lamp name and add a point light
-    ceilingLampNames.forEach((lampName) => {
-        const lamp = model.getObjectByName(lampName);
-        if (lamp) {
-            // Create a point light at the lamp's position
-            const pointLight = new THREE.PointLight(0xffffff, 3, 20); // Adjust intensity and distance as needed
-            pointLight.position.copy(lamp.position); // Set the light at the lamp's position
-            pointLight.castShadow = true;
-
-            // Move the light slightly downward
-            pointLight.position.y -= 0.2; // Adjust this value as necessary to lower the light
-
-            // Add the point light to the scene
-            this.scene_.add(pointLight);
-
-            // Optional: Add a helper to visualize each point light
-            const pointLightHelper = new THREE.PointLightHelper(pointLight, 0.3);
-            // this.scene_.add(pointLightHelper);
-
-            console.log(`Point light added at ${lampName} with adjusted position`, pointLight.position);
-        } else {
-            console.warn(`Lamp ${lampName} not found in model.`);
-        }
-    });
-}, undefined, (error) => {
-    console.error('Error loading GLB model:', error);
-});
-
-
-const mapLoader = new THREE.TextureLoader();
-const maxAnisotropy = this.threejs_.capabilities.getMaxAnisotropy();
-
-
-
-// Ambient and Hemisphere Lighting
-
-const ambientLight = new THREE.AmbientLight(0xffffff, 0.3);
-this.scene_.add(ambientLight);
-const hemiLight = new THREE.HemisphereLight(0xddeeff, 0x555555, 0.3);
-this.scene_.add(hemiLight);
-
-
-
-
-
-    this.sceneObjects = [];
-
-    const meshes = [
-      ];
-    this.objects_ = [];
-
-    // You can still create bounding boxes if needed, but don't pass them to raycasting
-    const boundingBoxes = meshes.map(mesh => {
-      const b = new THREE.Box3();
-      b.setFromObject(mesh);
-      return b;
-      });
-
-      // Crosshair
-      const crosshair = mapLoader.load('resources/crosshair.png');
-      crosshair.anisotropy = maxAnisotropy;
-
-      this.sprite_ = new THREE.Sprite(
-      new THREE.SpriteMaterial({map: crosshair, color: 0xffffff, fog: false, depthTest: false, depthWrite: false}));
-      this.sprite_.scale.set(0.15, 0.15 * this.camera_.aspect, 1)
-      this.sprite_.position.set(0, 0, -10);
-      // this.createViewingPlanes_();
-
-  }
+ 
 
 
   createSecondaryScenes_() {
@@ -740,9 +798,12 @@ this.scene_.add(hemiLight);
     const ambientLight = new THREE.AmbientLight(0xffffff, 0.3);
     this.sharedScene.add(ambientLight);
     const loader = new GLTFLoader();
-    loader.load('resources/ax222.glb', (gltf) => {
+    loader.load('resources/monmon33.glb', (gltf) => {
         const model = gltf.scene;
-    
+        model.traverse((child) => {
+          console.log("Object:", child.name);  // This will log all object names within the model
+      });
+  
         // Define monitor and screen names based on the structure
         const monitorNames = [
             'computerScreen006', 'computerScreen001', 'computerScreen002',
@@ -777,6 +838,16 @@ this.scene_.add(hemiLight);
     
         // Add the entire model to the scene, preserving Blender's original positions
         this.scene_.add(model);
+
+    model.traverse((child) => {
+      if (child.isMesh && (child.name.includes("wall") || child.name.includes("window"))) {
+        this.octree.fromGraphNode(child);
+          child.material.depthTest = true;
+
+          child.castShadow = true;
+          child.receiveShadow = true;
+      }
+  });
     }, undefined, (error) => {
         console.error('Error loading monitor model:', error);
     });
@@ -791,6 +862,9 @@ this.scene_.add(hemiLight);
         this.previousRAF_ = t;
       }
 
+
+
+      
       this.step_(t - this.previousRAF_);
       this.stats.begin(); 
       this.threejs_.autoClear = true;
@@ -808,6 +882,7 @@ this.scene_.add(hemiLight);
     this.threejs_.setRenderTarget(null); // Reset to render to screen
     this.threejs_.render(this.scene_, this.camera_);
     this.threejs_.autoClear = false;
+    this.threejs_.render(this.uiScene_, this.uiCamera_);
 
     this.stats.end();
     this.previousRAF_ = t;
@@ -818,6 +893,10 @@ this.scene_.add(hemiLight);
   step_(timeElapsed) {
     const timeElapsedS = timeElapsed * 0.001;
     this.fpsCamera_.update(timeElapsedS);
+      // Update the mixer for animations
+      if (this.mixer) {
+        this.mixer.update(timeElapsedS);
+    }
 
     const playerPos = this.fpsCamera_.player_.getPosition();
     const x = Math.floor(playerPos.x / this.segmentSize);
