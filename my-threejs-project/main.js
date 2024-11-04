@@ -751,8 +751,8 @@ const pointLightHelper = new THREE.PointLightHelper(pointLight, 0.5);
 this.scene_.add(pointLightHelper);
 
 
-const terrainWidth = 100;
-const terrainHeight = 100;
+const terrainWidth = 50;
+const terrainHeight = 30;
 const segments = 100; // Higher segment count for more detail in height adjustments
 const geometry = new THREE.PlaneGeometry(terrainWidth, terrainHeight, segments, segments);
 geometry.rotateX(-Math.PI / 2); // Rotate to lie flat on the X-Z plane
@@ -762,7 +762,7 @@ for (let i = 0; i < vertices.length; i += 3) {
   const x = vertices[i];
   const z = vertices[i + 2];
 
-  vertices[i + 1] = Math.sin(x * 0.1) * Math.cos(z * 0.1) * 5; // Adjusting y-axis for height
+  vertices[i + 1] = Math.sin(x * 0.1) * Math.cos(z * 0.1) * 4; // Adjusting y-axis for height
 }
 geometry.attributes.position.needsUpdate = true;
 geometry.computeVertexNormals();
@@ -775,24 +775,27 @@ geometry.computeVertexNormals();
   
   const terrain = new THREE.Mesh(geometry, terrainMaterial);
   terrain.receiveShadow = true;
-  const terrainHelper = new THREE.BoxHelper(terrain, 0xff0000); // Red box outline for visibility
-
   terrain.position.y = 0; // Set to ground level
-  terrain.position.x = 6; // Set to ground level
+  terrain.position.x = 36; // Set to ground level
+  terrain.position.z = 5; // Set to ground level
+// Define and align BoxHelper after positioning terrain
+const terrainBoundingBox = new THREE.Box3().setFromObject(terrain);
+const terrainHelper = new THREE.Box3Helper(terrainBoundingBox, 0xff0000); // Create a red Box3Helper
+this.scene_.add(terrainHelper);
 
-  this.scene_.add(terrainHelper);
 
 
   this.scene_.add(terrain);
   this.octree.fromGraphNode(terrain);  // Add terrain to the octree for collision detection
 
   // Function to get terrain height at specific x, y position
-  const getTerrainHeight = (x, z) => {
-    const raycaster = new THREE.Raycaster();
-    raycaster.set(new THREE.Vector3(x, 50, z), new THREE.Vector3(0, -1, 0)); // Cast downward
-    const intersects = raycaster.intersectObject(terrain);
-    return intersects.length > 0 ? intersects[0].point.y : 0;
-  };
+// Function to get terrain height at specific (x, z) position
+const getTerrainHeight = (x, z) => {
+  const raycaster = new THREE.Raycaster();
+  raycaster.set(new THREE.Vector3(x, 50, z), new THREE.Vector3(0, -1, 0));  // Cast downward
+  const intersects = raycaster.intersectObject(terrain);
+  return intersects.length > 0 ? intersects[0].point.y : terrain.position.y;  // Return terrain base if no intersection
+};
 
   const treeModels = [];
 
@@ -834,10 +837,10 @@ const placeTrees = () => {
     const randomTreeIndex = Math.floor(Math.random() * treeModels.length);
     const treeClone = treeModels[randomTreeIndex].clone();
 
-    // Randomize position and rotation
-    const x = Math.random() * terrainWidth - terrainWidth / 2;
-    const z = Math.random() * terrainHeight - terrainHeight / 2;
-    const y = getTerrainHeight(x, z, terrain);
+    // Randomize position within terrain bounds, adjusting by terrain's position offset
+    const x = Math.random() * terrainWidth - terrainWidth / 2 + terrain.position.x;
+    const z = Math.random() * terrainHeight - terrainHeight / 2 + terrain.position.z;
+    const y = getTerrainHeight(x, z);
     
 
     treeClone.position.set(x, y, z);
@@ -1089,13 +1092,15 @@ this.scene_.add(hemiLight);
                   screen.material = new THREE.MeshBasicMaterial({
                       map: this.renderTargets[i].texture,
                       side: THREE.DoubleSide,
+                      toneMapped: false, // Ensure no tone mapping is applied to this specific material
+
                   });
                   console.log(`Applied render target to ${screenNames[i]} on ${monitorName}`);
       
                   // Get screen's world position
                   const screenWorldPosition = new THREE.Vector3();
                   screen.getWorldPosition(screenWorldPosition);
-      
+
                   // Define RectAreaLight size and intensity
                   const lightWidth = 1.9;      // Adjust width as needed
                   const lightHeight = 1.2;     // Adjust height as needed
