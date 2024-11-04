@@ -646,7 +646,7 @@ loadModels_() {
   const loader2 = new GLTFLoader();
   loader2.load('resources/GreyDoor.glb', (gltf) => {
     const model = gltf.scene;
-    model.scale.set(4, 1.9, 2);
+    model.scale.set(2, 1.9, 2);
     model.position.set(5.5, -0.2, -5.9);
     this.scene_.add(model);
 
@@ -744,6 +744,110 @@ const pointLightHelper = new THREE.PointLightHelper(pointLight, 0.5);
 this.scene_.add(pointLightHelper);
 
 
+const terrainWidth = 100;
+const terrainHeight = 100;
+const segments = 100; // Higher segment count for more detail in height adjustments
+const geometry = new THREE.PlaneGeometry(terrainWidth, terrainHeight, segments, segments);
+geometry.rotateX(-Math.PI / 2); // Rotate to lie flat on the X-Z plane
+
+const vertices = geometry.attributes.position.array;
+for (let i = 0; i < vertices.length; i += 3) {
+  const x = vertices[i];
+  const z = vertices[i + 2];
+
+  vertices[i + 1] = Math.sin(x * 0.1) * Math.cos(z * 0.1) * 5; // Adjusting y-axis for height
+}
+geometry.attributes.position.needsUpdate = true;
+geometry.computeVertexNormals();
+
+
+
+  // Create and add the terrain mesh
+  const terrainMaterial = new THREE.MeshStandardMaterial({ color: 0x8b8b5e, side: THREE.DoubleSide });
+  terrainMaterial.side = THREE.DoubleSide;
+  
+  const terrain = new THREE.Mesh(geometry, terrainMaterial);
+  terrain.receiveShadow = true;
+  const terrainHelper = new THREE.BoxHelper(terrain, 0xff0000); // Red box outline for visibility
+
+  terrain.position.y = 0; // Set to ground level
+  terrain.position.x = 6; // Set to ground level
+
+  this.scene_.add(terrainHelper);
+
+  
+  this.scene_.add(terrain);
+
+  // Function to get terrain height at specific x, y position
+  const getTerrainHeight = (x, z) => {
+    const raycaster = new THREE.Raycaster();
+    raycaster.set(new THREE.Vector3(x, 50, z), new THREE.Vector3(0, -1, 0)); // Cast downward
+    const intersects = raycaster.intersectObject(terrain);
+    return intersects.length > 0 ? intersects[0].point.y : 0;
+  };
+
+  const treeModels = [];
+
+  // Load each GLB tree model
+  const loader3 = new GLTFLoader();
+  const treePaths = [
+    'resources/Tree.glb',
+    'resources/TreeFall.glb',
+    'resources/TreeLarge.glb',
+    'resources/TreeFallLarge.glb'
+  ];
+  
+// Load each tree model and store promises
+const loadTreePromises = treePaths.map((path, index) =>
+  new Promise((resolve, reject) => {
+    loader3.load(
+      path,
+      (gltf) => {
+        const treeModel = gltf.scene;
+        treeModel.traverse((node) => {
+          if (node.isMesh) {
+            node.castShadow = true;
+            node.receiveShadow = true;
+          }
+        });
+        treeModels[index] = treeModel; // Store the loaded model
+        resolve();
+      },
+      undefined,
+      (error) => reject(error)
+    );
+  })
+);
+
+// Function to place trees on terrain
+const placeTrees = () => {
+  const numTrees = 50;
+  for (let i = 0; i < numTrees; i++) {
+    const randomTreeIndex = Math.floor(Math.random() * treeModels.length);
+    const treeClone = treeModels[randomTreeIndex].clone();
+
+    // Randomize position and rotation
+    const x = Math.random() * terrainWidth - terrainWidth / 2;
+    const z = Math.random() * terrainHeight - terrainHeight / 2;
+    const y = getTerrainHeight(x, z, terrain);
+    
+
+    treeClone.position.set(x, y, z);
+    treeClone.rotation.y = Math.random() * Math.PI * 2;
+    treeClone.scale.setScalar(0.8 + Math.random() * 0.4);
+
+    this.scene_.add(treeClone);
+  }
+};
+
+// Wait for all tree models to load, then place trees
+Promise.all(loadTreePromises)
+  .then(() => {
+    placeTrees();
+    console.log("All trees placed on the terrain.");
+  })
+  .catch((error) => console.error("Error loading tree models:", error));
+  
 // Define specific offsets to adjust RectAreaLight positions independently for each window
 // Define specific offsets to adjust RectAreaLight positions independently for each window
     // Load the door model with animations
@@ -930,7 +1034,7 @@ this.scene_.add(hemiLight);
     const ambientLight = new THREE.AmbientLight(0xffffff, 0.3);
     this.sharedScene.add(ambientLight);
     const loader = new GLTFLoader();
-    loader.load('resources/monmon33.glb', (gltf) => {
+    loader.load('resources/untitledGOOD.glb', (gltf) => {
         const model = gltf.scene;
         model.traverse((child) => {
           console.log("Object:", child.name);  // This will log all object names within the model
@@ -1044,10 +1148,6 @@ this.scene_.add(hemiLight);
       this.step_(t - this.previousRAF_);
       this.stats.begin(); 
       this.threejs_.autoClear = true;
-    // Animate the directional light in the sharedScene
-    const time = new Date().getTime();
-    this.sharedSceneDirectionalLight.position.x = Math.cos(time * 0.002) * 10;
-    this.sharedSceneDirectionalLight.position.z = Math.sin(time * 0.002) * 10;
 
     // Render the secondary cameras
     this.secondaryCameras.forEach((camera, i) => {
