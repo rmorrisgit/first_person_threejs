@@ -737,7 +737,6 @@ const xOffset = -3; // Horizontal offset to position the light across the X-axis
 const yOffset = 3;  // Additional vertical offset to position it near the ceiling
 const zOffset = -4; // Offset to move the light along the Z-axis
 
-// Point Light Setup
 const pointLight = new THREE.PointLight(0xffffff, 3, 50);
 pointLight.position.set(xOffset, 1 + yOffset, zOffset);
 this.scene_.add(pointLight);
@@ -761,11 +760,11 @@ const maxAnisotropy = this.threejs_.capabilities.getMaxAnisotropy();
 
 
 
-// Ambient and Hemisphere Lighting
+// // Ambient and Hemisphere Lighting
 
-const ambientLight = new THREE.AmbientLight(0xffffff, 0.3);
+const ambientLight = new THREE.AmbientLight(0xffffff, 0.2);
 this.scene_.add(ambientLight);
-const hemiLight = new THREE.HemisphereLight(0xddeeff, 0x555555, 0.3);
+const hemiLight = new THREE.HemisphereLight(0xddeeff, 0x555555, 0.2);
 this.scene_.add(hemiLight);
 
 
@@ -971,23 +970,47 @@ this.scene_.add(hemiLight);
             const monitor = model.getObjectByName(monitorName);
     
             if (monitor) {
-                // Attempt to find the screen within each monitor
-                const screen = monitor.getObjectByName(screenNames[i]);
-                if (screen) {
-                    // Apply the render target to the screen
-                    this.renderTargets[i].texture.flipY = false;
-                    screen.material = new THREE.MeshBasicMaterial({
-                        map: this.renderTargets[i].texture,
-                        side: THREE.DoubleSide,
-                    });
-                    console.log(`Applied render target to ${screenNames[i]} on ${monitorName}`);
-                } else {
-                    console.error(`Screen ${screenNames[i]} not found in ${monitorName}`);
-                }
-            } else {
-                console.error(`${monitorName} not found in model`);
-            }
-        });
+              const screen = monitor.getObjectByName(screenNames[i]);
+              if (screen) {
+                  // Apply the render target to the screen
+                  this.renderTargets[i].texture.flipY = false;
+                  screen.material = new THREE.MeshBasicMaterial({
+                      map: this.renderTargets[i].texture,
+                      side: THREE.DoubleSide,
+                  });
+                  console.log(`Applied render target to ${screenNames[i]} on ${monitorName}`);
+      
+                  // Get screen's world position
+                  const screenWorldPosition = new THREE.Vector3();
+                  screen.getWorldPosition(screenWorldPosition);
+      
+                  // Define RectAreaLight size and intensity
+                  const lightWidth = 1.9;      // Adjust width as needed
+                  const lightHeight = 1.2;     // Adjust height as needed
+                  const lightIntensity = 1.8;  // Adjust intensity if necessary
+      
+                  // Create and position RectAreaLight
+                  const rectLight = new RectAreaLight(0xffffff, lightIntensity, lightWidth, lightHeight);
+                  rectLight.position.set(
+                      screenWorldPosition.x,  // Set x position to screen's x
+                      screenWorldPosition.y,  // Set y position to screen's y
+                      screenWorldPosition.z + 0.3 // Slight z offset to position in front
+                  );
+                  
+                  rectLight.lookAt(screenWorldPosition); // Ensure light faces the screen
+                  this.scene_.add(rectLight);
+      
+                  // Optional: RectAreaLightHelper for visualization
+                  // const rectLightHelper = new RectAreaLightHelper(rectLight);
+                  // this.scene_.add(rectLightHelper);
+      
+              } else {
+                  console.error(`Screen ${screenNames[i]} not found in ${monitorName}`);
+              }
+          } else {
+              console.error(`${monitorName} not found in model`);
+          }
+      });
     
         // Add the entire model to the scene, preserving Blender's original positions
         this.scene_.add(model);
