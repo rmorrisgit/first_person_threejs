@@ -204,13 +204,20 @@ class Player {
         this.updateCapsulePosition();
 
         // Temporarily update ground level on any collision
-        this.groundLevel = this.position.y;
+        const isGroundCollision = result.normal.y > 0.5;
+        if (isGroundCollision) {
         this.isGrounded = true;
         this.isJumping = false;
         velocity.y = 0;
+        this.groundLevel = this.position.y;
+
     } else {
         this.isGrounded = false;
     }
+  } else {
+    // If no collision detected, player is in freefall
+    this.isGrounded = false;
+  }
 
     console.log("Collision Result:", result ? "Collided" : "No Collision", 
                 "Surface Normal:", result ? result.normal.y : "N/A", 
@@ -775,8 +782,9 @@ geometry.computeVertexNormals();
 
   this.scene_.add(terrainHelper);
 
-  
+
   this.scene_.add(terrain);
+  this.octree.fromGraphNode(terrain);  // Add terrain to the octree for collision detection
 
   // Function to get terrain height at specific x, y position
   const getTerrainHeight = (x, z) => {
