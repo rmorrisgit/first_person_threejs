@@ -600,16 +600,7 @@ initializeKeycardAndDoor(handle, door, keycard, wiggleAction, doorAction) {
 class FirstPersonCameraDemo {
   constructor() {    
 
-    this.cubeTextureLoader = new THREE.CubeTextureLoader();
-    this.skyboxTexture = this.cubeTextureLoader.load([
-      './resources/skybox/posx.jpg',
-      './resources/skybox/negx.jpg',
-      './resources/skybox/posy.jpg',
-      './resources/skybox/negy.jpg',
-      './resources/skybox/posz.jpg',
-      './resources/skybox/negz.jpg',
-    ]);
-   this.skyboxTexture.encoding = THREE.sRGBEncoding;
+ 
    this.initializeRenderer_(); // Ensure this is called early
 
    this.initialize_(); 
@@ -688,7 +679,7 @@ loadModels_() {
 
     // Load the keycard model after the door is loaded
     const loader = new GLTFLoader();
-    loader.load('resources/monmon33.glb', (gltf) => {
+    loader.load('resources/untitledGOO22222.glb', (gltf) => {
       const monmonModel = gltf.scene;
       this.scene_.add(monmonModel);
 
@@ -717,10 +708,6 @@ loadModels_() {
     }
   }
   initializeScene_() {
-    this.sharedSceneDirectionalLight = new THREE.DirectionalLight(0xffffff, 0.6);
-    this.sharedSceneDirectionalLight.position.set(10, 20, 10);
-    this.sharedSceneDirectionalLight.castShadow = true;
-    this.sharedScene.add(this.sharedSceneDirectionalLight);
 
     // Octree must be initialized before adding objects to it
     if (!this.octree) {
@@ -1010,42 +997,44 @@ this.scene_.add(hemiLight);
 
 
   createSecondaryScenes_() {
-    this.sharedScene = new THREE.Scene();
-    this.sharedScene.background = this.skyboxTexture;
 
     this.secondaryCameras = [];
     this.renderTargets = [];
     const cameraSettings = { fov: 45, aspect: 1, near: 0.1, far: 500 };
 
     // Set up secondary cameras and render targets for each screen
-    for (let i = 0; i < 6; i++) {
-        const camera = new THREE.PerspectiveCamera(cameraSettings.fov, cameraSettings.aspect, cameraSettings.near, cameraSettings.far);
-        camera.position.set(0, 5, 10 * (i + 1));
-        camera.lookAt(0, 0, 0);
+     // Set up secondary cameras and render targets for each screen
+     for (let i = 0; i < 6; i++) {
+      const camera = new THREE.PerspectiveCamera(
+          cameraSettings.fov,
+          cameraSettings.aspect,
+          cameraSettings.near,
+          cameraSettings.far
+      );
 
-        const renderTarget = new THREE.WebGLRenderTarget(256, 256);
-        renderTarget.texture.minFilter = THREE.LinearFilter;
-        renderTarget.texture.generateMipmaps = false;
-        renderTarget.texture.encoding = THREE.sRGBEncoding;
+      // Position each camera strategically for varied views
+      switch (i) {
+          case 0: camera.position.set(10, 5, 0); camera.lookAt(0, 0, 0); break;
+          case 1: camera.position.set(-10, 5, 0); camera.lookAt(0, 0, 0); break;
+          case 2: camera.position.set(0, 5, 10); camera.lookAt(0, 0, 0); break;
+          case 3: camera.position.set(0, 5, -10); camera.lookAt(0, 0, 0); break;
+          case 4: camera.position.set(5, 10, 5); camera.lookAt(0, 0, 0); break;
+          case 5: camera.position.set(-5, 10, -5); camera.lookAt(0, 0, 0); break;
+      }
 
-        this.secondaryCameras.push(camera);
-        this.renderTargets.push(renderTarget);
-    }
-// Flag to ensure monmon33.glb loads only once
-    // Add floor and ambient light to the shared scene
-    const mapLoader = new THREE.TextureLoader();
-    const floorTexture = mapLoader.load('resources/concrete_floor_worn_001_rough_2k.jpg');
-    floorTexture.wrapS = floorTexture.wrapT = THREE.RepeatWrapping;
-    floorTexture.repeat.set(5, 5);
-    const floorMaterial = new THREE.MeshStandardMaterial({ map: floorTexture });
-    const floor = new THREE.Mesh(new THREE.PlaneGeometry(100, 100), floorMaterial);
-    floor.rotation.x = -Math.PI / 2;
-    this.sharedScene.add(floor);
+      // Render targets to project onto screens
+      const renderTarget = new THREE.WebGLRenderTarget(256, 256);
+      renderTarget.texture.minFilter = THREE.LinearFilter;
+      renderTarget.texture.generateMipmaps = false;
+      renderTarget.texture.encoding = THREE.sRGBEncoding;
 
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.3);
-    this.sharedScene.add(ambientLight);
+      this.secondaryCameras.push(camera);
+      this.renderTargets.push(renderTarget);
+  }
+
+
     const loader = new GLTFLoader();
-    loader.load('resources/untitledGOOD.glb', (gltf) => {
+    loader.load('resources/untitledGOO22222.glb', (gltf) => {
         const model = gltf.scene;
         model.traverse((child) => {
           console.log("Object:", child.name);  // This will log all object names within the model
@@ -1163,10 +1152,11 @@ this.scene_.add(hemiLight);
       this.threejs_.autoClear = true;
 
     // Render the secondary cameras
-    this.secondaryCameras.forEach((camera, i) => {
-      this.threejs_.setRenderTarget(this.renderTargets[i]);
-      this.threejs_.render(this.sharedScene, camera);
-    });
+         // Render each secondary camera view to its render target
+         this.secondaryCameras.forEach((camera, i) => {
+          this.threejs_.setRenderTarget(this.renderTargets[i]);
+          this.threejs_.render(this.scene_, camera);
+      });
 
     this.threejs_.setRenderTarget(null); // Reset to render to screen
     this.threejs_.render(this.scene_, this.camera_);
