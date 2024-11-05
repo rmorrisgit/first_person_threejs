@@ -738,9 +738,12 @@ const pointLightHelper = new THREE.PointLightHelper(pointLight, 0.5);
 this.scene_.add(pointLightHelper);
 
 
-const terrainWidth = 50;
-const terrainHeight = 30;
+const terrainWidth = 100;
+const terrainHeight = 100;
 const segments = 100; // Higher segment count for more detail in height adjustments
+const flatEdgeMargin = 10; // Distance from the edges for standard flattening
+const extendedEastMargin = 190; // Extended margin for the east edge flattening
+
 const geometry = new THREE.PlaneGeometry(terrainWidth, terrainHeight, segments, segments);
 geometry.rotateX(-Math.PI / 2); // Rotate to lie flat on the X-Z plane
 
@@ -749,31 +752,40 @@ for (let i = 0; i < vertices.length; i += 3) {
   const x = vertices[i];
   const z = vertices[i + 2];
 
-  vertices[i + 1] = Math.sin(x * 0.1) * Math.cos(z * 0.1) * 4; // Adjusting y-axis for height
+  // Calculate the distance to each edge with different margins
+  const distanceToWestEdge = Math.max(0, ((-x) - (terrainWidth / 2 - flatEdgeMargin)) / flatEdgeMargin);
+  const distanceToNorthEdge = Math.max(0, (z - (terrainHeight / 2 - flatEdgeMargin)) / flatEdgeMargin);
+  const distanceToSouthEdge = Math.max(0, ((-z) - (terrainHeight / 2 - flatEdgeMargin)) / flatEdgeMargin);
+  
+  // Extended flattening for the east edge (positive X-axis)
+  const distanceToEastEdge = Math.max(0, (x - (terrainWidth / 2 - extendedEastMargin)) / extendedEastMargin);
+
+  // Apply the maximum distance as the edge factor, prioritizing the extended east edge
+  const edgeFactor = Math.max(distanceToWestEdge, distanceToNorthEdge, distanceToSouthEdge, distanceToEastEdge);
+
+  // Increase bumpiness with higher frequency in the center
+  const bumpFrequency = 0.3; // Higher frequency for more bumps
+  const height = Math.sin(x * bumpFrequency) * Math.cos(z * bumpFrequency) * 6; // Increase amplitude for taller bumps
+  vertices[i + 1] = height * (1 - edgeFactor); // Gradually reduce height to zero at the edges
 }
+
 geometry.attributes.position.needsUpdate = true;
 geometry.computeVertexNormals();
 
+// Create and add the terrain mesh
+const terrainMaterial = new THREE.MeshStandardMaterial({ color: 0x8b8b5e, side: THREE.DoubleSide });
+const terrain = new THREE.Mesh(geometry, terrainMaterial);
+terrain.receiveShadow = true;
 
+terrain.position.y = -1; // Set to ground level
+terrain.position.x = -33;
+terrain.position.z = -5;
 
-  // Create and add the terrain mesh
-  const terrainMaterial = new THREE.MeshStandardMaterial({ color: 0x8b8b5e, side: THREE.DoubleSide });
-  terrainMaterial.side = THREE.DoubleSide;
-  
-  const terrain = new THREE.Mesh(geometry, terrainMaterial);
-  terrain.receiveShadow = true;
-  terrain.position.y = 0; // Set to ground level
-  terrain.position.x = 36; // Set to ground level
-  terrain.position.z = 5; // Set to ground level
-// Define and align BoxHelper after positioning terrain
-const terrainBoundingBox = new THREE.Box3().setFromObject(terrain);
-const terrainHelper = new THREE.Box3Helper(terrainBoundingBox, 0xff0000); // Create a red Box3Helper
-this.scene_.add(terrainHelper);
+this.scene_.add(terrain);
 
-
-
-  this.scene_.add(terrain);
   this.octree.fromGraphNode(terrain);  // Add terrain to the octree for collision detection
+  const boundingBox = new THREE.Box3().setFromObject(terrain);
+
 
   // Function to get terrain height at specific x, y position
 // Function to get terrain height at specific (x, z) position
@@ -819,29 +831,36 @@ const loadTreePromises = treePaths.map((path, index) =>
 
 // Function to place trees on terrain
 const placeTrees = () => {
-  const numTrees = 50;
-  for (let i = 0; i < numTrees; i++) {
-    const randomTreeIndex = Math.floor(Math.random() * treeModels.length);
-    const treeClone = treeModels[randomTreeIndex].clone();
+  const numTrees = 80;
 
-    // Randomize position within terrain bounds, adjusting by terrain's position offset
+  // Define exclusion zone after rotation; let's say we want the north edge to be free of trees
+  const exclusionZoneWidth = terrainWidth * 0.2; // Exclude 10% of terrain width on the specified side
+  const exclusionStartX = terrain.position.x + terrainWidth / 2 - exclusionZoneWidth; // Adjusted for rotated terrain
+
+  for (let i = 0; i < numTrees; i++) {
     const x = Math.random() * terrainWidth - terrainWidth / 2 + terrain.position.x;
     const z = Math.random() * terrainHeight - terrainHeight / 2 + terrain.position.z;
+  
+    // Skip placing trees within 10% of the specified perpendicular edge along x-axis
+    if (x > exclusionStartX && x < exclusionStartX + exclusionZoneWidth) continue;
+  
     const y = getTerrainHeight(x, z);
-    
-
+    const treeClone = treeModels[Math.floor(Math.random() * treeModels.length)].clone();
     treeClone.position.set(x, y, z);
     treeClone.rotation.y = Math.random() * Math.PI * 2;
-    treeClone.scale.setScalar(0.8 + Math.random() * 0.4);
-
+    treeClone.scale.setScalar(1.5 + Math.random() * 5);
     this.scene_.add(treeClone);
-  }
-};
+}
 
+};
 // Wait for all tree models to load, then place trees
 Promise.all(loadTreePromises)
   .then(() => {
-    placeTrees();
+    placeTrees(terrain);
+
+  
+// Place trees on the mirrored terrain
+// Place trees on the mirrored terrain
     console.log("All trees placed on the terrain.");
   })
   .catch((error) => console.error("Error loading tree models:", error));
@@ -1014,14 +1033,37 @@ this.scene_.add(hemiLight);
 
       // Position each camera strategically for varied views
       switch (i) {
-          case 0: camera.position.set(10, 5, 0); camera.lookAt(0, 0, 0); break;
-          case 1: camera.position.set(-10, 5, 0); camera.lookAt(0, 0, 0); break;
-          case 2: camera.position.set(0, 5, 10); camera.lookAt(0, 0, 0); break;
-          case 3: camera.position.set(0, 5, -10); camera.lookAt(0, 0, 0); break;
-          case 4: camera.position.set(5, 10, 5); camera.lookAt(0, 0, 0); break;
-          case 5: camera.position.set(-5, 10, -5); camera.lookAt(0, 0, 0); break;
-      }
-
+        case 0: 
+            // Front Left Corner Camera
+            camera.position.set(0, 3, 0); 
+            camera.lookAt(7.8, 1.5, 5.7); // Focused toward the center of the house
+            break;
+        case 1: 
+            // Front Right Corner Camera
+            camera.position.set(15.6, 3, 0); 
+            camera.lookAt(7.8, 1.5, 5.7); // Angled toward the center
+            break;
+        case 2: 
+            // Back Left Corner Camera
+            camera.position.set(0, 3, 11.4); 
+            camera.lookAt(7.8, 1.5, 5.7); // Angled toward the house center
+            break;
+        case 3: 
+            // Back Right Corner Camera
+            camera.position.set(15.6, 3, 11.4); 
+            camera.lookAt(7.8, 1.5, 5.7); // Aimed at center
+            break;
+        case 4: 
+            // Front Door Camera (above door, focused on entry)
+            camera.position.set(7.8, 2.5, 0); 
+            camera.lookAt(7.8, 1, 2); // Angled slightly down to capture the entrance
+            break;
+        case 5: 
+            // Back Door Camera (above back door)
+            camera.position.set(7.8, 2.5, 11.4); 
+            camera.lookAt(7.8, 1, 9); // Aimed downward at the back door area
+            break;
+    }
       // Render targets to project onto screens
       const renderTarget = new THREE.WebGLRenderTarget(256, 256);
       renderTarget.texture.minFilter = THREE.LinearFilter;
