@@ -679,7 +679,7 @@ loadModels_() {
 
     // Load the keycard model after the door is loaded
     const loader = new GLTFLoader();
-    loader.load('resources/untitledGOO22222.glb', (gltf) => {
+    loader.load('resources/democamz1.glb', (gltf) => {
       const monmonModel = gltf.scene;
       this.scene_.add(monmonModel);
 
@@ -738,7 +738,7 @@ const pointLightHelper = new THREE.PointLightHelper(pointLight, 0.5);
 this.scene_.add(pointLightHelper);
 
 
-const terrainWidth = 100;
+const terrainWidth = 80;
 const terrainHeight = 100;
 const segments = 100; // Higher segment count for more detail in height adjustments
 const flatEdgeMargin = 10; // Distance from the edges for standard flattening
@@ -773,12 +773,12 @@ geometry.attributes.position.needsUpdate = true;
 geometry.computeVertexNormals();
 
 // Create and add the terrain mesh
-const terrainMaterial = new THREE.MeshStandardMaterial({ color: 0x8b8b5e, side: THREE.DoubleSide });
+const terrainMaterial = new THREE.MeshStandardMaterial({ color: 0xffffff, side: THREE.DoubleSide });
 const terrain = new THREE.Mesh(geometry, terrainMaterial);
 terrain.receiveShadow = true;
 
 terrain.position.y = -1; // Set to ground level
-terrain.position.x = -33;
+terrain.position.x = -27;
 terrain.position.z = -5;
 
 this.scene_.add(terrain);
@@ -834,7 +834,7 @@ const placeTrees = () => {
   const numTrees = 80;
 
   // Define exclusion zone after rotation; let's say we want the north edge to be free of trees
-  const exclusionZoneWidth = terrainWidth * 0.2; // Exclude 10% of terrain width on the specified side
+  const exclusionZoneWidth = terrainWidth * 0.3; // Exclude 10% of terrain width on the specified side
   const exclusionStartX = terrain.position.x + terrainWidth / 2 - exclusionZoneWidth; // Adjusted for rotated terrain
 
   for (let i = 0; i < numTrees; i++) {
@@ -848,7 +848,8 @@ const placeTrees = () => {
     const treeClone = treeModels[Math.floor(Math.random() * treeModels.length)].clone();
     treeClone.position.set(x, y, z);
     treeClone.rotation.y = Math.random() * Math.PI * 2;
-    treeClone.scale.setScalar(1.5 + Math.random() * 5);
+// Set a larger range for more size variation
+treeClone.scale.setScalar(2 + Math.random() * 2.5);
     this.scene_.add(treeClone);
 }
 
@@ -880,6 +881,55 @@ const mapLoader = new THREE.TextureLoader();
 const maxAnisotropy = this.threejs_.capabilities.getMaxAnisotropy();
 
 
+const movingLight = new THREE.PointLight(0xff0000, 2, 100); // Start with red color
+this.scene_.add(movingLight);
+
+// Optional: Visualize the moving light position
+const lightHelper = new THREE.PointLightHelper(movingLight, 0.5);
+this.scene_.add(lightHelper);
+
+// Store the movingLight and helper for later reference
+this.movingLight = movingLight;
+this.lightHelper = lightHelper;
+
+// Create a second moving light with initial color blue
+const movingLight2 = new THREE.PointLight(0x0000ff, 2, 100);
+this.scene_.add(movingLight2);
+
+// Optional: Visualize the second moving light
+const lightHelper2 = new THREE.PointLightHelper(movingLight2, 0.5);
+this.scene_.add(lightHelper2);
+
+// Store for later use in the render loop
+this.movingLight2 = movingLight2;
+this.lightHelper2 = lightHelper2;
+
+// Define the TorusKnotGeometry
+// Define the TorusKnotGeometry
+
+
+
+
+const torusKnotGeometry = new THREE.TorusKnotGeometry(1, 0.3, 100, 16);
+const torusKnotMaterial = new THREE.MeshStandardMaterial({ color: 0xff6347 });
+const torusKnot = new THREE.Mesh(torusKnotGeometry, torusKnotMaterial);
+
+// Set exact position manually
+torusKnot.position.set(18, 3, -20);  // Replace with your desired x, y, z coordinates
+
+// Add the torus knot to the main scene
+this.scene_.add(torusKnot);
+
+// Animation function for the torus knot rotation
+const animateTorusKnot = () => {
+    requestAnimationFrame(animateTorusKnot);
+    torusKnot.rotation.x += 0.01; // Adjust values for desired rotation speed
+    torusKnot.rotation.y += 0.01;
+};
+
+// Call the animation function to start rotating the torus knot
+animateTorusKnot();
+
 
 // // Ambient and Hemisphere Lighting
 
@@ -890,7 +940,32 @@ this.scene_.add(hemiLight);
 
 
 
+// Load the Dragon model
+const loader4 = new GLTFLoader();
+let dragonMixer; // Animation mixer for the dragon
 
+loader4.load('resources/Dragon.glb', (gltf) => {
+    const dragonModel = gltf.scene;
+
+    // Set initial position and scale of the dragon
+    dragonModel.position.set(45, 9, -40); // Adjust x, y, z coordinates as needed
+    dragonModel.scale.set(0.5, 0.5, 0.5); // Adjust the scale if needed
+
+    // Add the dragon model to the main scene
+    this.scene_.add(dragonModel);
+
+    // Set up the animation mixer and play the flying animation
+    dragonMixer = new THREE.AnimationMixer(dragonModel);
+    const flyAction = dragonMixer.clipAction(gltf.animations[3]); // Assumes the flying animation is the first animation
+    flyAction.play();
+
+    // Define the animation update function and store it for use in the render loop
+    this.animateDragon = (delta) => {
+        if (dragonMixer) dragonMixer.update(delta);
+    };
+}, undefined, (error) => {
+    console.error('Error loading Dragon model:', error);
+});
 
     this.sceneObjects = [];
 
@@ -1023,60 +1098,23 @@ this.scene_.add(hemiLight);
 
     // Set up secondary cameras and render targets for each screen
      // Set up secondary cameras and render targets for each screen
-     for (let i = 0; i < 6; i++) {
-      const camera = new THREE.PerspectiveCamera(
-          cameraSettings.fov,
-          cameraSettings.aspect,
-          cameraSettings.near,
-          cameraSettings.far
-      );
+  // Set up secondary cameras and render targets for each screen
+    for (let i = 0; i < 6; i++) {
+        const camera = new THREE.PerspectiveCamera(cameraSettings.fov, cameraSettings.aspect, cameraSettings.near, cameraSettings.far);
+        this.secondaryCameras.push(camera);
 
-      // Position each camera strategically for varied views
-      switch (i) {
-        case 0: 
-            // Front Left Corner Camera
-            camera.position.set(0, 3, 0); 
-            camera.lookAt(7.8, 1.5, 5.7); // Focused toward the center of the house
-            break;
-        case 1: 
-            // Front Right Corner Camera
-            camera.position.set(15.6, 3, 0); 
-            camera.lookAt(7.8, 1.5, 5.7); // Angled toward the center
-            break;
-        case 2: 
-            // Back Left Corner Camera
-            camera.position.set(0, 3, 11.4); 
-            camera.lookAt(7.8, 1.5, 5.7); // Angled toward the house center
-            break;
-        case 3: 
-            // Back Right Corner Camera
-            camera.position.set(15.6, 3, 11.4); 
-            camera.lookAt(7.8, 1.5, 5.7); // Aimed at center
-            break;
-        case 4: 
-            // Front Door Camera (above door, focused on entry)
-            camera.position.set(7.8, 2.5, 0); 
-            camera.lookAt(7.8, 1, 2); // Angled slightly down to capture the entrance
-            break;
-        case 5: 
-            // Back Door Camera (above back door)
-            camera.position.set(7.8, 2.5, 11.4); 
-            camera.lookAt(7.8, 1, 9); // Aimed downward at the back door area
-            break;
+        // Render targets to project onto screens
+        const renderTarget = new THREE.WebGLRenderTarget(256, 256);
+        renderTarget.texture.minFilter = THREE.LinearFilter;
+        renderTarget.texture.generateMipmaps = false;
+        renderTarget.texture.encoding = THREE.sRGBEncoding;
+        this.renderTargets.push(renderTarget);
     }
-      // Render targets to project onto screens
-      const renderTarget = new THREE.WebGLRenderTarget(256, 256);
-      renderTarget.texture.minFilter = THREE.LinearFilter;
-      renderTarget.texture.generateMipmaps = false;
-      renderTarget.texture.encoding = THREE.sRGBEncoding;
 
-      this.secondaryCameras.push(camera);
-      this.renderTargets.push(renderTarget);
-  }
 
 
     const loader = new GLTFLoader();
-    loader.load('resources/untitledGOO22222.glb', (gltf) => {
+    loader.load('resources/democamz1.glb', (gltf) => {
         const model = gltf.scene;
         model.traverse((child) => {
           console.log("Object:", child.name);  // This will log all object names within the model
@@ -1094,12 +1132,56 @@ this.scene_.add(hemiLight);
      console.error("Keycard object 'RootNode' not found in monmon33.");
    }
 
+   // Define camera position mesh names
+   const cameraMeshNames = [
+    'NurbsPath', 'NurbsPath001', 'NurbsPath002', 
+    'NurbsPath003', 'NurbsPath004', 'NurbsPath005'
+];
+
+// Apply each camera mesh position to the corresponding secondary camera, with an offset
+const cameraOffset = 0.5; // Adjust this to move the camera back along its Z-axis
+cameraMeshNames.forEach((meshName, index) => {
+       const mesh = model.getObjectByName(meshName);
+            if (mesh && this.secondaryCameras[index]) {
+                const camera = this.secondaryCameras[index];
+
+                // Set position and apply an offset
+                camera.position.copy(mesh.position);
+                camera.translateZ(-cameraOffset);
+
+        // Apply an offset along the local Z-axis to move the camera back slightly
+        this.secondaryCameras[index].translateZ(-cameraOffset);
+   // Turn the second camera left by 90 degrees
+   if (index === 0) {
+    camera.rotation.y += Math.PI / 2; // Rcam four
+
+} else if(index === 2) {
+  camera.rotation.y += Math.PI / 2; // Rotate 90 degrees to the left
+}else if
+   //cam two 
+(index === 4) {
+  camera.rotation.y += Math.PI / 2; // Rotate 90 degrees to the left
+}
+else if (index === 3) {
+  camera.rotation.y += Math.PI / 2; // Rcam four
+
+  // Tilt down along the local axis
+  const downTilt = new THREE.Quaternion();
+  downTilt.setFromAxisAngle(new THREE.Vector3(1, 0, 0), -Math.PI / 18); // Tilt down 10 degrees
+  camera.quaternion.multiplyQuaternions(camera.quaternion, downTilt);
+}
+// else if  (index === 5) {
+//   camera.rotation.y += Math.PI / 2; // Rotate 90 degrees to the left
+//   // cam three
+// }
 
 
-
-
-
-
+        this.secondaryCameras[index].updateProjectionMatrix();
+        console.log(`Secondary camera ${index} set from ${meshName} with offset`);
+    } else {
+        console.warn(`Mesh ${meshName} or secondary camera ${index} not found`);
+    }
+});
 
 
         // Define monitor and screen names based on the structure
@@ -1186,10 +1268,43 @@ this.scene_.add(hemiLight);
         this.previousRAF_ = t;
       }
 
+      const delta = (t - this.previousRAF_) * 0.001; // Convert to seconds
+      this.step_(delta);
 
+      // Update the dragon animation if the animateDragon function is defined
+      if (this.animateDragon) {
+          this.animateDragon(delta);
+      }
+ // First moving light animation
+// First moving light animation
+const time = t * 0.001;
+const radius1 = 30; // Increased radius for more distance from the house
+this.movingLight.distance = 10; // Reduced distance to limit light reach
+this.movingLight.position.set(
+    Math.sin(time) * radius1, 
+    8 + Math.sin(time * 0.5) * 2, // Slightly higher elevation
+    Math.cos(time) * radius1
+);
+const color1 = new THREE.Color(`hsl(${(time * 50) % 360}, 100%, 50%)`);
+this.movingLight.color.set(color1);
+if (this.lightHelper) this.lightHelper.update();
 
-      
+// Second moving light animation
+const radius2 = 25; // Increased radius for more distance from the house
+const colorSpeed2 = 70; // Faster color change rate
+this.movingLight2.distance = 8; // Reduced distance to limit light reach
+this.movingLight2.position.set(
+    Math.cos(time * 1.1) * radius2, // Offset frequency for a different path
+    8 + Math.sin(time * 0.3) * 3,  // Higher elevation
+    Math.sin(time * 1.1) * radius2
+);
+const color2 = new THREE.Color(`hsl(${(time * colorSpeed2) % 360}, 100%, 50%)`);
+this.movingLight2.color.set(color2);
+if (this.lightHelper2) this.lightHelper2.update();
+
+ 
       this.step_(t - this.previousRAF_);
+
       this.stats.begin(); 
       this.threejs_.autoClear = true;
 
