@@ -285,6 +285,7 @@ class FirstPersonCamera {
   this.headBobSpeed_ = 12;
   this.headBobHeight_ = .13;
   this.raycaster = new THREE.Raycaster(); // Store a single raycaster instance
+  this.lastFootstepTime_ = 0; // Define this variable in the constructor
 
   this.isSprinting = false; // State for sprinting
   this.sprintTimeout = false; // Sprint timeout state
@@ -298,18 +299,18 @@ class FirstPersonCamera {
   this.objects_ = objects;
   this.sceneObjects = sceneObjects || [];     // Audio listener setup
   this.scene_ = scene;  // Store the scene for use in addDecal_
-  // const listener = new THREE.AudioListener();
-  // camera.add(listener);
-  // this.footstepSound_ = new THREE.Audio(listener);
-  // const audioLoader = new THREE.AudioLoader();
-  // // Load the footstep audio
-  // audioLoader.load('./sounds/footstep.ogg', (buffer) => {
-  //   this.footstepSound_.setBuffer(buffer);
-  //   this.footstepSound_.setLoop(false); // Prevent looping
-  //   this.footstepSound_.setVolume(0.5);
-  // }, undefined, (error) => {
-  //   console.error('An error occurred while loading the audio file:', error);
-  // });
+  const listener = new THREE.AudioListener();
+  camera.add(listener);
+  this.footstepSound_ = new THREE.Audio(listener);
+  const audioLoader = new THREE.AudioLoader();
+  // Load the footstep audio
+  audioLoader.load('./sounds/footstep.ogg', (buffer) => {
+    this.footstepSound_.setBuffer(buffer);
+    this.footstepSound_.setLoop(false); // Prevent looping
+    this.footstepSound_.setVolume(0.5);
+  }, undefined, (error) => {
+    console.error('An error occurred while loading the audio file:', error);
+  });
 
 
 
@@ -462,9 +463,9 @@ initializeKeycardAndDoor(handle, door, keycard, wiggleAction, doorAction) {
     if (this.isJumping) {
     // Do not apply head bobbing when jumping
     this.headBobTimer_ = 0; // Optionally reset timer while jumping
-    // if (this.footstepSound_.isPlaying) {
-    //     this.footstepSound_.stop(); // Stop sound if jumping
-    // }
+    if (this.footstepSound_.isPlaying) {
+        this.footstepSound_.stop(); // Stop sound if jumping
+    }
     return; // Exit the method to avoid head bobbing
     }
     if (this.headBobActive_) {
@@ -476,16 +477,10 @@ initializeKeycardAndDoor(handle, door, keycard, wiggleAction, doorAction) {
       if (this.headBobTimer_ == nextStepTime) {
         this.headBobActive_ = false;
       }    
-      //     if (this.footstepSound_.isPlaying) {
-      //       this.footstepSound_.stop();
-      //     }
-      //   }
-      // } else if (!this.isMoving) {
-      //   // Ensure head bobbing and sound stop immediately when not moving
-      //   this.headBobTimer_ = 0; // Reset the timer if not moving
-      //   if (this.footstepSound_.isPlaying) {
-      //     this.footstepSound_.stop(); // Stop sound immediately
-      //   }
+          if (this.footstepSound_.isPlaying) {
+            this.footstepSound_.stop();
+          }
+      
     }
   }
 
@@ -536,6 +531,17 @@ initializeKeycardAndDoor(handle, door, keycard, wiggleAction, doorAction) {
       this.translation_.add(forward);
       this.translation_.add(left);
     }
+
+
+
+
+
+
+
+
+
+
+    
     // Update player's capsule position
     this.player_.position.copy(this.translation_);
     this.player_.updateCapsulePosition();
@@ -544,22 +550,28 @@ initializeKeycardAndDoor(handle, door, keycard, wiggleAction, doorAction) {
     // After handling collisions, update translation again
     this.translation_.copy(this.player_.getPosition());
     // If grounded (confirmed by collision), snap to ground level
+    // If grounded (confirmed by collision), snap to ground level
     if (this.isGrounded) {
       this.translation_.y = this.groundLevel; // Snap to ground level only when confirmed grounded
       this.velocity.y = 0;
-    }
-    //   // Play footstep sound when moving
-    //   if (!this.footstepSound_.isPlaying) {
-    //     this.footstepSound_.play();
-    //   }
-    // } else {
-    //   // Stop footstep sound when not moving
-    //   if (this.footstepSound_.isPlaying) {
-    //     this.footstepSound_.stop();
-    //   }
-    //   this.headBobActive_ = false; // Disable head bobbing when not moving
-
   }
+
+  // Play footstep sound with a delay when moving and grounded
+  // if (this.isMoving && this.isGrounded) {
+  //     const currentTime = performance.now();
+  //     if (currentTime - (this.lastFootstepTime_ || 0) > 500) { // 500 ms delay
+  //         if (!this.footstepSound_.isPlaying) {
+  //             this.footstepSound_.play();
+  //             this.lastFootstepTime_ = currentTime; // Update the last footstep time
+  //         }
+  //     }
+  // } else {
+  //     if (this.footstepSound_.isPlaying) {
+  //         this.footstepSound_.stop();
+  //     }
+  //     this.headBobActive_ = false;
+  // }
+}
   initializeHandleWiggle(handle, wiggleAction) {
     this.handle = handle;
     this.wiggleAction = wiggleAction;
@@ -679,7 +691,7 @@ loadModels_() {
 
     // Load the keycard model after the door is loaded
     const loader = new GLTFLoader();
-    loader.load('resources/democamz1.glb', (gltf) => {
+    loader.load('resources/democamz11.glb', (gltf) => {
       const monmonModel = gltf.scene;
       this.scene_.add(monmonModel);
 
@@ -734,8 +746,8 @@ const zOffset = -4; // Offset to move the light along the Z-axis
 const pointLight = new THREE.PointLight(0xffffff, 3, 50);
 pointLight.position.set(xOffset, 1 + yOffset, zOffset);
 this.scene_.add(pointLight);
-const pointLightHelper = new THREE.PointLightHelper(pointLight, 0.5);
-this.scene_.add(pointLightHelper);
+// const pointLightHelper = new THREE.PointLightHelper(pointLight, 0.5);
+// this.scene_.add(pointLightHelper);
 
 
 const terrainWidth = 80;
@@ -765,7 +777,7 @@ for (let i = 0; i < vertices.length; i += 3) {
 
   // Increase bumpiness with higher frequency in the center
   const bumpFrequency = 0.3; // Higher frequency for more bumps
-  const height = Math.sin(x * bumpFrequency) * Math.cos(z * bumpFrequency) * 6; // Increase amplitude for taller bumps
+  const height = Math.sin(x * bumpFrequency) * Math.cos(z * bumpFrequency) * 8; // Increase amplitude for taller bumps
   vertices[i + 1] = height * (1 - edgeFactor); // Gradually reduce height to zero at the edges
 }
 
@@ -948,7 +960,7 @@ loader4.load('resources/Dragon.glb', (gltf) => {
     const dragonModel = gltf.scene;
 
     // Set initial position and scale of the dragon
-    dragonModel.position.set(45, 9, -40); // Adjust x, y, z coordinates as needed
+    dragonModel.position.set(45, 7, -35); // Adjust x, y, z coordinates as needed
     dragonModel.scale.set(0.5, 0.5, 0.5); // Adjust the scale if needed
 
     // Add the dragon model to the main scene
@@ -1114,7 +1126,7 @@ loader4.load('resources/Dragon.glb', (gltf) => {
 
 
     const loader = new GLTFLoader();
-    loader.load('resources/democamz1.glb', (gltf) => {
+    loader.load('resources/democamz11.glb', (gltf) => {
         const model = gltf.scene;
         model.traverse((child) => {
           console.log("Object:", child.name);  // This will log all object names within the model
@@ -1169,6 +1181,10 @@ else if (index === 3) {
   const downTilt = new THREE.Quaternion();
   downTilt.setFromAxisAngle(new THREE.Vector3(1, 0, 0), -Math.PI / 18); // Tilt down 10 degrees
   camera.quaternion.multiplyQuaternions(camera.quaternion, downTilt);
+}else if
+//cam two 
+(index === 5) {
+camera.rotation.y += Math.PI / 4; // Rotate 90 degrees to the left
 }
 // else if  (index === 5) {
 //   camera.rotation.y += Math.PI / 2; // Rotate 90 degrees to the left
