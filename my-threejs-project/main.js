@@ -1,16 +1,9 @@
 import * as THREE from 'https://cdn.skypack.dev/three@0.136';
 import Stats from 'https://cdn.skypack.dev/three@0.136.0/examples/jsm/libs/stats.module.js';
-import { EXRLoader } from 'https://cdn.skypack.dev/three@0.136/examples/jsm/loaders/EXRLoader.js';
 import { Octree } from 'three/examples/jsm/math/Octree';
 import { Capsule } from 'three/examples/jsm/math/Capsule';
 import { GLTFLoader } from 'https://cdn.skypack.dev/three@0.136/examples/jsm/loaders/GLTFLoader.js';
-
-
-
-import { DecalGeometry } from 'https://cdn.skypack.dev/three@0.136/examples/jsm/geometries/DecalGeometry.js';
-
 import { RectAreaLight } from 'three';
-import { RectAreaLightHelper } from 'three/examples/jsm/helpers/RectAreaLightHelper.js';
 import { RectAreaLightUniformsLib } from 'three/examples/jsm/lights/RectAreaLightUniformsLib.js';
 RectAreaLightUniformsLib.init();
 
@@ -226,34 +219,6 @@ class Player {
 }
 
 
-  /*  if (result) {
-    // Detect if the collision is mostly with the ground
-    const isGroundCollision = result.normal.y > 0.5;  // Ground collision if the normal is pointing mostly upwards
-    const isWallCollision = Math.abs(result.normal.y) < 0.5; // Treat near-horizontal normals as walls
-
-    if (isGroundCollision) {
-      // Collision with the ground or top of an object
-      this.isGrounded = true;
-      this.isJumping = false;
-      velocity.y = 0; // Stop vertical velocity
-      this.position.y += result.depth; // Snap player to the ground/object top
-    } else if (isWallCollision) {
-      // Handle wall collision
-      const normalComponent = result.normal.dot(velocity);
-      if (normalComponent < 0) {
-        // Only push the player away if they are colliding with a wall
-        velocity.addScaledVector(result.normal, -normalComponent); // Push the player out of the wall
-      }
-      this.position.add(result.normal.multiplyScalar(result.depth + 0.01)); // Small offset to prevent clipping
-    }
-
-    // Update capsule position after collision
-    this.updateCapsulePosition();
-  } else {
-    this.isGrounded = false; // No collision means not grounded
-  }
-}*/
-  
   getPosition() {
     return this.position;
     
@@ -532,16 +497,6 @@ initializeKeycardAndDoor(handle, door, keycard, wiggleAction, doorAction) {
       this.translation_.add(left);
     }
 
-
-
-
-
-
-
-
-
-
-    
     // Update player's capsule position
     this.player_.position.copy(this.translation_);
     this.player_.updateCapsulePosition();
@@ -555,7 +510,6 @@ initializeKeycardAndDoor(handle, door, keycard, wiggleAction, doorAction) {
       this.translation_.y = this.groundLevel; // Snap to ground level only when confirmed grounded
       this.velocity.y = 0;
   }
-
   // Play footstep sound with a delay when moving and grounded
   // if (this.isMoving && this.isGrounded) {
   //     const currentTime = performance.now();
@@ -640,15 +594,14 @@ class FirstPersonCameraDemo {
 
     // Now assign fpsCamera_ to player explicitly
     this.player_.firstPersonCamera = this.fpsCamera_;
-
     this.initStats();
  
     this.previousRAF_ = null;
     this.raf_();
     this.onWindowResize_();
 
-// Load models after fpsCamera_ is set up
-this.loadModels_();
+    // Load models after fpsCamera_ is set up
+    this.loadModels_();
 }
 
 loadModels_() {
@@ -748,7 +701,26 @@ pointLight.position.set(xOffset, 1 + yOffset, zOffset);
 this.scene_.add(pointLight);
 // const pointLightHelper = new THREE.PointLightHelper(pointLight, 0.5);
 // this.scene_.add(pointLightHelper);
+// Light 1
+const light1 = new THREE.PointLight(0xff0000, 13, 20); // Red color, adjust intensity and distance
+light1.position.set(xOffset + 25, yOffset + 2, zOffset + -23);
+this.scene_.add(light1);
+// const lightHelper1 = new THREE.PointLightHelper(light1, 0.5);
+// this.scene_.add(lightHelper1);
 
+// Light 2
+// const light2 = new THREE.PointLight(0x00ff00, 23, 10); // Green color
+// light2.position.set(xOffset + -41, yOffset + 0, zOffset + -22);
+// this.scene_.add(light2);
+// const lightHelper4 = new THREE.PointLightHelper(light2, 0.5);
+// this.scene_.add(lightHelper4);
+
+// Light 3
+const light3 = new THREE.PointLight(0xffffff, 20, 20); // Blue color
+light3.position.set(xOffset + 44, yOffset + 3, zOffset + 1);
+this.scene_.add(light3);
+const lightHelper3 = new THREE.PointLightHelper(light3, 0.5);
+this.scene_.add(lightHelper3);
 
 const terrainWidth = 80;
 const terrainHeight = 100;
@@ -928,6 +900,7 @@ const torusKnot = new THREE.Mesh(torusKnotGeometry, torusKnotMaterial);
 
 // Set exact position manually
 torusKnot.position.set(18, 3, -20);  // Replace with your desired x, y, z coordinates
+torusKnot.scale.set(2, 2, 2); // Scale it up further
 
 // Add the torus knot to the main scene
 this.scene_.add(torusKnot);
@@ -1166,21 +1139,30 @@ cameraMeshNames.forEach((meshName, index) => {
    // Turn the second camera left by 90 degrees
    if (index === 0) {
     camera.rotation.y += Math.PI / 2; // Rcam four
+ 
+    // Tilt down along the local axis by 10 degrees
+    const downTilt = new THREE.Quaternion();
+    downTilt.setFromAxisAngle(new THREE.Vector3(1, 0, 0), -Math.PI / 12); // Tilt down 10 degrees
 
+    // Combine the rotations
+    camera.quaternion.multiplyQuaternions(camera.quaternion, downTilt);   // Then tilt down
 } else if(index === 2) {
   camera.rotation.y += Math.PI / 2; // Rotate 90 degrees to the left
+      // Tilt down along the local axis by 10 degrees
+      const downTilt = new THREE.Quaternion();
+      downTilt.setFromAxisAngle(new THREE.Vector3(1, 0, 0), -Math.PI / 12); // Tilt down 10 degrees
+  
+      // Combine the rotations
+      camera.quaternion.multiplyQuaternions(camera.quaternion, downTilt);   // Then tilt down
 }else if
    //cam two 
 (index === 4) {
   camera.rotation.y += Math.PI / 2; // Rotate 90 degrees to the left
 }
 else if (index === 3) {
-  camera.rotation.y += Math.PI / 2; // Rcam four
+  camera.rotation.y += Math.PI / 2; // Rcam one
 
-  // Tilt down along the local axis
-  const downTilt = new THREE.Quaternion();
-  downTilt.setFromAxisAngle(new THREE.Vector3(1, 0, 0), -Math.PI / 18); // Tilt down 10 degrees
-  camera.quaternion.multiplyQuaternions(camera.quaternion, downTilt);
+
 }else if
 //cam two 
 (index === 5) {
@@ -1293,28 +1275,33 @@ camera.rotation.y += Math.PI / 4; // Rotate 90 degrees to the left
       }
  // First moving light animation
 // First moving light animation
+const speedMultiplier1 = 0.5; // Adjust this for the first light's speed
+const speedMultiplier2 = 0.8; // Adjust this for the second light's speed
+
 const time = t * 0.001;
-const radius1 = 30; // Increased radius for more distance from the house
-this.movingLight.distance = 10; // Reduced distance to limit light reach
+
+// First moving light animation with speed control
+const radius1 = 30;
+this.movingLight.distance = 10;
 this.movingLight.position.set(
-    Math.sin(time) * radius1, 
-    8 + Math.sin(time * 0.5) * 2, // Slightly higher elevation
-    Math.cos(time) * radius1
+    Math.sin(time * speedMultiplier1) * radius1, 
+    8 + Math.sin(time * speedMultiplier1 * 0.5) * 2, 
+    Math.cos(time * speedMultiplier1) * radius1
 );
-const color1 = new THREE.Color(`hsl(${(time * 50) % 360}, 100%, 50%)`);
+const color1 = new THREE.Color(`hsl(${(time * speedMultiplier1 * 50) % 360}, 100%, 50%)`);
 this.movingLight.color.set(color1);
 if (this.lightHelper) this.lightHelper.update();
 
-// Second moving light animation
-const radius2 = 25; // Increased radius for more distance from the house
-const colorSpeed2 = 70; // Faster color change rate
-this.movingLight2.distance = 8; // Reduced distance to limit light reach
+// Second moving light animation with speed control
+const radius2 = 25;
+const colorSpeed2 = 70;
+this.movingLight2.distance = 8;
 this.movingLight2.position.set(
-    Math.cos(time * 1.1) * radius2, // Offset frequency for a different path
-    8 + Math.sin(time * 0.3) * 3,  // Higher elevation
-    Math.sin(time * 1.1) * radius2
+    Math.cos(time * speedMultiplier2 * 1.1) * radius2,
+    8 + Math.sin(time * speedMultiplier2 * 0.3) * 3, 
+    Math.sin(time * speedMultiplier2 * 1.1) * radius2
 );
-const color2 = new THREE.Color(`hsl(${(time * colorSpeed2) % 360}, 100%, 50%)`);
+const color2 = new THREE.Color(`hsl(${(time * speedMultiplier2 * colorSpeed2) % 360}, 100%, 50%)`);
 this.movingLight2.color.set(color2);
 if (this.lightHelper2) this.lightHelper2.update();
 
