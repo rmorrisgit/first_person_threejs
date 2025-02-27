@@ -821,12 +821,6 @@ this.scene_.add(lightHelper2);
 this.movingLight2 = movingLight2;
 this.lightHelper2 = lightHelper2;
 
-// Define the TorusKnotGeometry
-// Define the TorusKnotGeometry
-
-
-
-
 const torusKnotGeometry = new THREE.TorusKnotGeometry(1, 0.3, 100, 16);
 const torusKnotMaterial = new THREE.MeshStandardMaterial({ color: 0xff6347 });
 const torusKnot = new THREE.Mesh(torusKnotGeometry, torusKnotMaterial);
@@ -849,13 +843,10 @@ const animateTorusKnot = () => {
 animateTorusKnot();
 
 
-// // Ambient and Hemisphere Lighting
-
 const ambientLight = new THREE.AmbientLight(0xffffff, 0.2);
 this.scene_.add(ambientLight);
 const hemiLight = new THREE.HemisphereLight(0xddeeff, 0x555555, 0.2);
 this.scene_.add(hemiLight);
-
 
 
 // Load the Dragon model
@@ -887,8 +878,7 @@ loader4.load('resources/Dragon.glb', (gltf) => {
 
     this.sceneObjects = [];
 
-    const meshes = [
-      ];
+    const meshes = [];
     this.objects_ = [];
 
     // You can still create bounding boxes if needed, but don't pass them to raycasting
@@ -1058,6 +1048,7 @@ loader4.load('resources/Dragon.glb', (gltf) => {
 
 // Apply each camera mesh position to the corresponding secondary camera, with an offset
 const cameraOffset = 0.5; // Adjust this to move the camera back along its Z-axis
+
 cameraMeshNames.forEach((meshName, index) => {
        const mesh = model.getObjectByName(meshName);
             if (mesh && this.secondaryCameras[index]) {
@@ -1072,39 +1063,39 @@ cameraMeshNames.forEach((meshName, index) => {
    // Turn the second camera left by 90 degrees
    if (index === 0) {
     camera.rotation.y += Math.PI / 2; // Rcam four
- 
+
     // Tilt down along the local axis by 10 degrees
     const downTilt = new THREE.Quaternion();
     downTilt.setFromAxisAngle(new THREE.Vector3(1, 0, 0), -Math.PI / 12); // Tilt down 10 degrees
 
     // Combine the rotations
     camera.quaternion.multiplyQuaternions(camera.quaternion, downTilt);   // Then tilt down
-} else if(index === 2) {
-  camera.rotation.y += Math.PI / 2; // Rotate 90 degrees to the left
-      // Tilt down along the local axis by 10 degrees
-      const downTilt = new THREE.Quaternion();
-      downTilt.setFromAxisAngle(new THREE.Vector3(1, 0, 0), -Math.PI / 12); // Tilt down 10 degrees
-  
-      // Combine the rotations
-      camera.quaternion.multiplyQuaternions(camera.quaternion, downTilt);   // Then tilt down
-}else if
-   //cam two 
-(index === 4) {
-  camera.rotation.y += Math.PI / 2; // Rotate 90 degrees to the left
-}
-else if (index === 3) {
-  camera.rotation.y += Math.PI / 2; // Rcam one
+    } else if(index === 2) {
+      camera.rotation.y += Math.PI / 2; // Rotate 90 degrees to the left
+          // Tilt down along the local axis by 10 degrees
+          const downTilt = new THREE.Quaternion();
+          downTilt.setFromAxisAngle(new THREE.Vector3(1, 0, 0), -Math.PI / 12); // Tilt down 10 degrees
+      
+          // Combine the rotations
+          camera.quaternion.multiplyQuaternions(camera.quaternion, downTilt);   // Then tilt down
+    }else if
+      //cam two 
+    (index === 4) {
+      camera.rotation.y += Math.PI / 2; // Rotate 90 degrees to the left
+    }
+    else if (index === 3) {
+      camera.rotation.y += Math.PI / 2; // Rcam one
 
 
-}else if
-//cam two 
-(index === 5) {
-camera.rotation.y += Math.PI / 4; // Rotate 90 degrees to the left
-}
-// else if  (index === 5) {
-//   camera.rotation.y += Math.PI / 2; // Rotate 90 degrees to the left
-//   // cam three
-// }
+    }else if
+    //cam two 
+    (index === 5) {
+    camera.rotation.y += Math.PI / 4; // Rotate 90 degrees to the left
+    }
+    // else if  (index === 5) {
+    //   camera.rotation.y += Math.PI / 2; // Rotate 90 degrees to the left
+    //   // cam three
+    // }
 
 
         this.secondaryCameras[index].updateProjectionMatrix();
@@ -1188,8 +1179,6 @@ camera.rotation.y += Math.PI / 4; // Rotate 90 degrees to the left
     }, undefined, (error) => {
         console.error('Error loading monitor model:', error);
     });
-    
-    
 
   }    
 
@@ -1206,50 +1195,47 @@ camera.rotation.y += Math.PI / 4; // Rotate 90 degrees to the left
       if (this.animateDragon) {
           this.animateDragon(delta);
       }
- // First moving light animation
-// First moving light animation
-const speedMultiplier1 = 0.5; // Adjust this for the first light's speed
-const speedMultiplier2 = 0.8; // Adjust this for the second light's speed
+  // First moving light animation
+  const speedMultiplier1 = 0.5; // Adjust this for the first light's speed
+  const speedMultiplier2 = 0.8; // Adjust this for the second light's speed
 
-const time = t * 0.001;
+  const time = t * 0.001;
 
-// First moving light animation with speed control
-const radius1 = 30;
-this.movingLight.distance = 10;
-this.movingLight.position.set(
-    Math.sin(time * speedMultiplier1) * radius1, 
-    8 + Math.sin(time * speedMultiplier1 * 0.5) * 2, 
-    Math.cos(time * speedMultiplier1) * radius1
-);
-const color1 = new THREE.Color(`hsl(${(time * speedMultiplier1 * 50) % 360}, 100%, 50%)`);
-this.movingLight.color.set(color1);
-if (this.lightHelper) this.lightHelper.update();
+  // First moving light animation with speed control
+  const radius1 = 30;
+  this.movingLight.distance = 10;
+  this.movingLight.position.set(
+      Math.sin(time * speedMultiplier1) * radius1, 
+      8 + Math.sin(time * speedMultiplier1 * 0.5) * 2, 
+      Math.cos(time * speedMultiplier1) * radius1
+  );
+  const color1 = new THREE.Color(`hsl(${(time * speedMultiplier1 * 50) % 360}, 100%, 50%)`);
+  this.movingLight.color.set(color1);
+  if (this.lightHelper) this.lightHelper.update();
 
-// Second moving light animation with speed control
-const radius2 = 25;
-const colorSpeed2 = 70;
-this.movingLight2.distance = 8;
-this.movingLight2.position.set(
-    Math.cos(time * speedMultiplier2 * 1.1) * radius2,
-    8 + Math.sin(time * speedMultiplier2 * 0.3) * 3, 
-    Math.sin(time * speedMultiplier2 * 1.1) * radius2
-);
-const color2 = new THREE.Color(`hsl(${(time * speedMultiplier2 * colorSpeed2) % 360}, 100%, 50%)`);
-this.movingLight2.color.set(color2);
-if (this.lightHelper2) this.lightHelper2.update();
+  // Second moving light animation with speed control
+  const radius2 = 25;
+  const colorSpeed2 = 70;
+  this.movingLight2.distance = 8;
+  this.movingLight2.position.set(
+      Math.cos(time * speedMultiplier2 * 1.1) * radius2,
+      8 + Math.sin(time * speedMultiplier2 * 0.3) * 3, 
+      Math.sin(time * speedMultiplier2 * 1.1) * radius2
+  );
+  const color2 = new THREE.Color(`hsl(${(time * speedMultiplier2 * colorSpeed2) % 360}, 100%, 50%)`);
+  this.movingLight2.color.set(color2);
 
- 
-      this.step_(t - this.previousRAF_);
-
-      this.stats.begin(); 
-      this.threejs_.autoClear = true;
+    if (this.lightHelper2) this.lightHelper2.update();
+  
+    this.step_(t - this.previousRAF_);
+    this.stats.begin(); 
+    this.threejs_.autoClear = true;
 
     // Render the secondary cameras
-         // Render each secondary camera view to its render target
-         this.secondaryCameras.forEach((camera, i) => {
-          this.threejs_.setRenderTarget(this.renderTargets[i]);
-          this.threejs_.render(this.scene_, camera);
-      });
+      this.secondaryCameras.forEach((camera, i) => {
+      this.threejs_.setRenderTarget(this.renderTargets[i]);
+      this.threejs_.render(this.scene_, camera);
+  });
 
     this.threejs_.setRenderTarget(null); // Reset to render to screen
     this.threejs_.render(this.scene_, this.camera_);
@@ -1269,16 +1255,11 @@ if (this.lightHelper2) this.lightHelper2.update();
       if (this.mixer) {
         this.mixer.update(timeElapsedS);
     }
-
     const playerPos = this.fpsCamera_.player_.getPosition();
     const x = Math.floor(playerPos.x / this.segmentSize);
     const z = Math.floor(playerPos.z / this.segmentSize);
-
   }
-
-
 }
-
 
 let _APP = null;
 
