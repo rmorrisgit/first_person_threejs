@@ -4,9 +4,6 @@ import { Octree } from 'three/examples/jsm/math/Octree';
 import { Capsule } from 'three/examples/jsm/math/Capsule';
 import { GLTFLoader } from 'https://cdn.skypack.dev/three@0.136/examples/jsm/loaders/GLTFLoader.js';
 import { RectAreaLight } from 'three';
-import { RectAreaLightUniformsLib } from 'three/examples/jsm/lights/RectAreaLightUniformsLib.js';
-RectAreaLightUniformsLib.init();
-
 
 const KEYS = {
   'a': 65,
@@ -58,8 +55,6 @@ class InputController {
     this.previousKeys_ = {};
 
    // Add pointer lock change listener
-    // Add Pointer Lock event listeners
-
     this.target_.addEventListener('mousedown', (e) => this.onMouseDown_(e), false);
     this.target_.addEventListener('mousemove', (e) => this.onMouseMove_(e), false);
     this.target_.addEventListener('mouseup', (e) => this.onMouseUp_(e), false);
@@ -67,10 +62,8 @@ class InputController {
     this.target_.addEventListener('keyup', (e) => this.onKeyUp_(e), false);
   }
 
-
   onMouseMove_(e) {
   // Ignore mouse movement when not locked
-  //comment
     // Calculate centered mouse position
     this.current_.mouseX = e.pageX - window.innerWidth / 2;
     this.current_.mouseY = e.pageY - window.innerHeight / 2;
@@ -228,14 +221,13 @@ class Player {
 let hasKeycard = false;
 
 class FirstPersonCamera {
-  constructor(camera, player, objects, sceneObjects, scene, octree, doorOctree) {  // Add doorOctree here
+  constructor(camera, player, objects, sceneObjects, octree, doorOctree) {  // Add doorOctree here
   this.camera_ = camera;
   this.input_ = new InputController(); 
   this.octree = octree; // Use the octree
   this.doorOctree = doorOctree;
   this.player_ = player; // Now passing in the player object directly
   this.isDoorOpen = false; // Keep the boolean property name as is
-
   this.rotation_ = new THREE.Quaternion();
   this.baseHeight = 2; // Set the base height here (adjustable)
   this.translation_ = new THREE.Vector3(0, this.baseHeight, 0);
@@ -251,7 +243,6 @@ class FirstPersonCamera {
   this.headBobHeight_ = .13;
   this.raycaster = new THREE.Raycaster(); // Store a single raycaster instance
   this.lastFootstepTime_ = 0; // Define this variable in the constructor
-
   this.isSprinting = false; // State for sprinting
   this.sprintTimeout = false; // Sprint timeout state
   // Jumping variables
@@ -263,7 +254,6 @@ class FirstPersonCamera {
   this.groundLevel = this.baseHeight; // Set the ground level to the base height
   this.objects_ = objects;
   this.sceneObjects = sceneObjects || [];     // Audio listener setup
-  this.scene_ = scene;  // Store the scene for use in addDecal_
   const listener = new THREE.AudioListener();
   camera.add(listener);
   this.footstepSound_ = new THREE.Audio(listener);
@@ -367,36 +357,18 @@ initializeKeycardAndDoor(handle, door, keycard, wiggleAction, doorAction) {
   });
 }
 
-
-
-
   update(timeElapsedS) {
     this.updateRotation_(timeElapsedS);
     this.updateCamera_(timeElapsedS);
     this.updateTranslation_(timeElapsedS);
     this.updateHeadBob_(timeElapsedS);
-    this.addDecal_();        // Check and add decals on mouse click
-
     // You can access the player's position like this:
     // const playerPosition = this.player_.getPosition();
     // console.log("Player Position: ", playerPosition);
 
     this.input_.update(timeElapsedS);
   }
-  addDecal_() {
-    if (this.input_.current_.leftButton && !this.input_.previous_.leftButton) {
-      const centerScreen = new THREE.Vector2(0, 0);
-      this.raycaster.setFromCamera(centerScreen, this.camera_);
-      const hits = this.raycaster.intersectObjects(this.sceneObjects);
-  
-      if (hits.length > 0) {
-        // Only trigger if animation is not already playing
-        if (this.wiggleAction && !this.wiggleAction.isRunning) {
-          this.wiggleAction.reset();
-          this.wiggleAction.play();
-        }
-      }
-    }}
+
   updateCamera_(_) {
     this.camera_.quaternion.copy(this.rotation_);
     this.camera_.position.copy(this.translation_);
@@ -510,6 +482,11 @@ initializeKeycardAndDoor(handle, door, keycard, wiggleAction, doorAction) {
       this.translation_.y = this.groundLevel; // Snap to ground level only when confirmed grounded
       this.velocity.y = 0;
   }
+
+  
+  if (this.isMoving) {
+    this.headBobActive_ = true; // Activate head bobbing when moving
+}
   // Play footstep sound with a delay when moving and grounded
   // if (this.isMoving && this.isGrounded) {
   //     const currentTime = performance.now();
