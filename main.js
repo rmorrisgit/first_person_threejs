@@ -482,7 +482,6 @@ initializeKeycardAndDoor(handle, door, keycard, wiggleAction, doorAction) {
       this.translation_.y = this.groundLevel; // Snap to ground level only when confirmed grounded
       this.velocity.y = 0;
   }
-
   
   if (this.isMoving) {
     this.headBobActive_ = true; // Activate head bobbing when moving
@@ -685,13 +684,6 @@ this.scene_.add(light1);
 // const lightHelper1 = new THREE.PointLightHelper(light1, 0.5);
 // this.scene_.add(lightHelper1);
 
-// Light 2
-// const light2 = new THREE.PointLight(0x00ff00, 23, 10); // Green color
-// light2.position.set(xOffset + -41, yOffset + 0, zOffset + -22);
-// this.scene_.add(light2);
-// const lightHelper4 = new THREE.PointLightHelper(light2, 0.5);
-// this.scene_.add(lightHelper4);
-
 // Light 3
 const light3 = new THREE.PointLight(0xffffff, 20, 20); // Blue color
 light3.position.set(xOffset + 44, yOffset + 3, zOffset + 1);
@@ -747,8 +739,6 @@ this.scene_.add(terrain);
   this.octree.fromGraphNode(terrain);  // Add terrain to the octree for collision detection
   const boundingBox = new THREE.Box3().setFromObject(terrain);
 
-
-  // Function to get terrain height at specific x, y position
 // Function to get terrain height at specific (x, z) position
 const getTerrainHeight = (x, z) => {
   const raycaster = new THREE.Raycaster();
