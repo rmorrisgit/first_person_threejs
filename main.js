@@ -146,7 +146,8 @@ class Player {
     this.firstPersonCamera = firstPersonCamera;  // Store the camera instance
 
     this.position = new THREE.Vector3(0, 2, 0); // Initial player position
-
+    this.velocity = new THREE.Vector3(0, 0, 0); // Add velocity property
+    
     this.capsule = new Capsule(
       new THREE.Vector3(0, 1, 0), // Capsule base
       new THREE.Vector3(0, 2, 0), // Capsule top
@@ -159,33 +160,39 @@ class Player {
     this.capsule.end.copy(this.position).add(new THREE.Vector3(0, 1, 0)); // Set capsule height
   
   }
+  handleCollision() {
+    let result = this.octree ? this.octree.capsuleIntersect(this.capsule) : null;
 
-  handleCollision(velocity) {
-    let result = null;  // Use let instead of const
+    // Check door collision only if the door is closed
+    if (this.firstPersonCamera && !this.firstPersonCamera.checkIfDoorIsOpen() && this.doorOctree) {
+        const doorResult = this.doorOctree.capsuleIntersect(this.capsule);
+        if (doorResult && (!result || doorResult.depth > result.depth)) {
+            result = doorResult;
+            console.log("Collision detected with door.");
+        }
+    }
 
-    // Check for collision with the main octree
-    if (this.octree) {
-      result = this.octree.capsuleIntersect(this.capsule);
+    if (result) {
+        const adjustment = result.normal.clone().multiplyScalar(result.depth);
+        this.position.add(adjustment);
+        this.updateCapsulePosition(); // Ensure capsule follows corrected position
+
+        if (result.normal.y > 0) { 
+            this.isGrounded = true;
+            this.velocity.y = 0; // Stop downward movement
+        } else {
+            // Reset velocity along the collision normal
+            const velocityAlongNormal = this.velocity.clone().dot(result.normal);
+            if (velocityAlongNormal < 0) {
+                this.velocity.addScaledVector(result.normal, -velocityAlongNormal);
+            }
+        }
     }
-  
- 
-  // Check door collision only if the door is closed
-  if (this.firstPersonCamera && !this.firstPersonCamera.checkIfDoorIsOpen() && this.doorOctree) {
-    const doorResult = this.doorOctree.capsuleIntersect(this.capsule);
-    if (doorResult && (!result || doorResult.depth > result.depth)) {
-      result = doorResult;
-      console.log("Collision detected with door.");
-    }
-  }
-    console.log("Collision Result:", result ? "Collided" : "No Collision", 
-                "Surface Normal:", result ? result.normal.y : "N/A", 
-                "Is Grounded:", this.isGrounded, 
-                "Ground Level:", this.groundLevel);
 }
+
 
   getPosition() {
     return this.position;
-    
   }
 }
 
@@ -393,65 +400,64 @@ initializeKeycardAndDoor(handle, door, keycard, wiggleAction, doorAction) {
   }
 
   updateTranslation_(timeElapsedS) {
-    const forwardVelocity = (this.input_.key(KEYS.w) ? 1 : 0) + (this.input_.key(KEYS.s) ? -1 : 0)
-    const strafeVelocity = (this.input_.key(KEYS.a) ? 1 : 0) + (this.input_.key(KEYS.d) ? -1 : 0)
+    const forwardVelocity = (this.input_.key(KEYS.w) ? 1 : 0) + (this.input_.key(KEYS.s) ? -1 : 0);
+    const strafeVelocity = (this.input_.key(KEYS.a) ? 1 : 0) + (this.input_.key(KEYS.d) ? -1 : 0);
 
-    // Check if the player can sprint
-    const canSprint =  this.input_.key(KEYS.shift) && !this.isJumping;
+    // Sprint logic
+    const canSprint = this.input_.key(KEYS.shift) && !this.isJumping;
     const isSprinting = canSprint;
     const currentMoveSpeed = isSprinting ? this.moveSpeed_ * 2 : this.moveSpeed_;
-    const strafeSpeed = isSprinting ? currentMoveSpeed * 0.8 : currentMoveSpeed * 0.8;  
-    this.isSprinting = isSprinting; 
-      // Jump initiation
+    const strafeSpeed = currentMoveSpeed * 0.8; // Slightly slower strafing
+    this.isSprinting = isSprinting;
+
+    // Jumping logic
     if (this.isGrounded && this.input_.key(32)) { // Space key for jump
         this.isJumping = true;
-        const sprintFactor = isSprinting ? 1.7 : 1;
-        this.velocity.y = Math.sqrt(2 * -this.gravity * this.jumpHeight) * sprintFactor;
+        this.velocity.y = Math.sqrt(2 * -this.gravity * this.jumpHeight);
         this.isGrounded = false;
     }
+
     // Apply gravity if not grounded
     if (!this.isGrounded) {
         this.velocity.y += this.gravity * timeElapsedS;
     }
-    // Apply vertical movement
-    this.translation_.y += this.velocity.y * timeElapsedS;
-      // Check if the player is below ground level
-    if (this.translation_.y < this.groundLevel) {
-      this.translation_.y = this.groundLevel; // Snap to ground level
-      this.velocity.y = 0;  // Stop downward velocity
-      this.isGrounded = true; // Mark as grounded
-      this.isJumping = false;
+
+    // Break movement into multiple substeps (prevents skipping through objects)
+    const numSubsteps = 5;
+    for (let i = 0; i < numSubsteps; i++) {
+        const stepTime = timeElapsedS / numSubsteps;
+
+        // Calculate movement vectors
+        const qx = new THREE.Quaternion();
+        qx.setFromAxisAngle(new THREE.Vector3(0, 1, 0), this.phi_);
+
+        const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(qx).multiplyScalar(forwardVelocity * stepTime * currentMoveSpeed);
+        const left = new THREE.Vector3(-1, 0, 0).applyQuaternion(qx).multiplyScalar(strafeVelocity * stepTime * strafeSpeed);
+
+        // Apply movement
+        this.translation_.add(forward);
+        this.translation_.add(left);
+        this.translation_.y += this.velocity.y * stepTime;
+
+        // Check for collisions at each substep
+        this.player_.position.copy(this.translation_);
+        this.player_.updateCapsulePosition();
+        this.player_.handleCollision();
+        this.translation_.copy(this.player_.getPosition());
     }
-    // Handle movement
+
+    // Ensure player doesn't fall below ground level
+    if (this.translation_.y < this.groundLevel) {
+        this.translation_.y = this.groundLevel;
+        this.velocity.y = 0;
+        this.isGrounded = true;
+        this.isJumping = false;
+    }
+
     this.isMoving = forwardVelocity || strafeVelocity;
     if (this.isMoving) {
-      const qx = new THREE.Quaternion();
-      qx.setFromAxisAngle(new THREE.Vector3(0, 1, 0), this.phi_);
-
-      const forward = new THREE.Vector3(0, 0, -1);
-      forward.applyQuaternion(qx);
-      forward.multiplyScalar(forwardVelocity * timeElapsedS * currentMoveSpeed);
-
-      const left = new THREE.Vector3(-1, 0, 0);
-      left.applyQuaternion(qx);
-      left.multiplyScalar(strafeVelocity * timeElapsedS * strafeSpeed);
-
-      this.translation_.add(forward);
-      this.translation_.add(left);
+        this.headBobActive_ = true; // Activate head bobbing when moving
     }
-
-    // Update player's capsule position
-    this.player_.position.copy(this.translation_);
-    this.player_.updateCapsulePosition();
-    // Handle collisions
-    this.player_.handleCollision(this.velocity);
-    // After handling collisions, update translation again
-    this.translation_.copy(this.player_.getPosition());
-
-  
-  if (this.isMoving) {
-    this.headBobActive_ = true; // Activate head bobbing when moving
-}
   // Play footstep sound with a delay when moving and grounded
   // if (this.isMoving) {
   //     const currentTime = performance.now();
@@ -558,9 +564,9 @@ loadModels_() {
     // Add each child mesh of the door to the separate door octree
     model.traverse((child) => {
       if (child.isMesh) {
-        this.doorOctree.fromGraphNode(child);
+          this.doorOctree.fromGraphNode(child);  // Ensures door collisions are separate
       }
-    });
+  });
 
     console.log("Door added to the octree for collision detection.");
     this.mixer = new THREE.AnimationMixer(model);
@@ -702,8 +708,6 @@ terrain.position.z = -5;
 
 this.scene_.add(terrain);
 
-  this.octree.fromGraphNode(terrain);  // Add terrain to the octree for collision detection
-  const boundingBox = new THREE.Box3().setFromObject(terrain);
 
 // Function to get terrain height at specific (x, z) position
 const getTerrainHeight = (x, z) => {
@@ -1167,15 +1171,16 @@ cameraMeshNames.forEach((meshName, index) => {
         // Add the entire model to the scene, preserving Blender's original positions
         this.scene_.add(model);
 
-    model.traverse((child) => {
-      if (child.isMesh && (child.name.includes("wall") || child.name.includes("window"))) {
-        this.octree.fromGraphNode(child);
-          child.material.depthTest = true;
-
-          child.castShadow = true;
-          child.receiveShadow = true;
-      }
-  });
+        model.traverse((child) => {
+          if (child.isMesh) {
+            if (child.name.includes("wall") || child.name.includes("window")) {
+              this.octree.fromGraphNode(child);  // Add walls/windows to main octree
+            } else if (child.name.includes("door")) {
+              this.doorOctree.fromGraphNode(child); // Separate octree for door
+            }
+          }
+        });
+        
     }, undefined, (error) => {
         console.error('Error loading monitor model:', error);
     });
