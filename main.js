@@ -146,7 +146,6 @@ class Player {
     this.firstPersonCamera = firstPersonCamera;  // Store the camera instance
 
     this.position = new THREE.Vector3(0, 2, 0); // Initial player position
-    this.groundLevel = this.position.y; // Set default ground level
 
     this.capsule = new Capsule(
       new THREE.Vector3(0, 1, 0), // Capsule base
@@ -178,39 +177,11 @@ class Player {
       console.log("Collision detected with door.");
     }
   }
-
-
-    if (result) {
-        const normalComponent = result.normal.dot(velocity);
-        if (normalComponent < 0) {
-            velocity.addScaledVector(result.normal, -normalComponent);
-        }
-
-        this.position.add(result.normal.multiplyScalar(result.depth + 0.01));
-        this.updateCapsulePosition();
-
-        // Temporarily update ground level on any collision
-        const isGroundCollision = result.normal.y > 0.5;
-        if (isGroundCollision) {
-        this.isGrounded = true;
-        this.isJumping = false;
-        velocity.y = 0;
-        this.groundLevel = this.position.y;
-
-    } else {
-        this.isGrounded = false;
-    }
-  } else {
-    // If no collision detected, player is in freefall
-    this.isGrounded = false;
-  }
-
     console.log("Collision Result:", result ? "Collided" : "No Collision", 
                 "Surface Normal:", result ? result.normal.y : "N/A", 
                 "Is Grounded:", this.isGrounded, 
                 "Ground Level:", this.groundLevel);
 }
-
 
   getPosition() {
     return this.position;
@@ -476,18 +447,13 @@ initializeKeycardAndDoor(handle, door, keycard, wiggleAction, doorAction) {
     this.player_.handleCollision(this.velocity);
     // After handling collisions, update translation again
     this.translation_.copy(this.player_.getPosition());
-    // If grounded (confirmed by collision), snap to ground level
-    // If grounded (confirmed by collision), snap to ground level
-    if (this.isGrounded) {
-      this.translation_.y = this.groundLevel; // Snap to ground level only when confirmed grounded
-      this.velocity.y = 0;
-  }
+
   
   if (this.isMoving) {
     this.headBobActive_ = true; // Activate head bobbing when moving
 }
   // Play footstep sound with a delay when moving and grounded
-  // if (this.isMoving && this.isGrounded) {
+  // if (this.isMoving) {
   //     const currentTime = performance.now();
   //     if (currentTime - (this.lastFootstepTime_ || 0) > 500) { // 500 ms delay
   //         if (!this.footstepSound_.isPlaying) {
