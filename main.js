@@ -414,7 +414,7 @@ initializeKeycardAndDoor(handle, door, keycard, wiggleAction, doorAction) {
       this.isJumping = true;
       
       // Increase jump height when sprinting
-      const sprintMultiplier = this.isSprinting ? 1.5 : 1.0; // Adjust multiplier as needed
+      const sprintMultiplier = this.isSprinting ? 5.0 : 1.0; // Adjust multiplier as needed
       this.velocity.y = Math.sqrt(2 * -this.gravity * this.jumpHeight * sprintMultiplier);
 
       this.isGrounded = false;
