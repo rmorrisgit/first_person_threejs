@@ -409,12 +409,15 @@ initializeKeycardAndDoor(handle, door, keycard, wiggleAction, doorAction) {
     const currentMoveSpeed = isSprinting ? this.moveSpeed_ * 2 : this.moveSpeed_;
     const strafeSpeed = currentMoveSpeed * 0.8; // Slightly slower strafing
     this.isSprinting = isSprinting;
-
     // Jumping logic
     if (this.isGrounded && this.input_.key(32)) { // Space key for jump
-        this.isJumping = true;
-        this.velocity.y = Math.sqrt(2 * -this.gravity * this.jumpHeight);
-        this.isGrounded = false;
+      this.isJumping = true;
+      
+      // Increase jump height when sprinting
+      const sprintMultiplier = this.isSprinting ? 1.5 : 1.0; // Adjust multiplier as needed
+      this.velocity.y = Math.sqrt(2 * -this.gravity * this.jumpHeight * sprintMultiplier);
+
+      this.isGrounded = false;
     }
 
     // Apply gravity if not grounded
