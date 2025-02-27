@@ -779,24 +779,12 @@ treeClone.scale.setScalar(2 + Math.random() * 2.5);
 Promise.all(loadTreePromises)
   .then(() => {
     placeTrees(terrain);
-
   
-// Place trees on the mirrored terrain
 // Place trees on the mirrored terrain
     console.log("All trees placed on the terrain.");
   })
   .catch((error) => console.error("Error loading tree models:", error));
   
-// Define specific offsets to adjust RectAreaLight positions independently for each window
-// Define specific offsets to adjust RectAreaLight positions independently for each window
-    // Load the door model with animations
-  // Load the door model with animations
-  // Load the door model with animations
- // Load the door model with animations
-// Load the door model with animations
-// Load the door model with animations
-// Load the door model with animations
-
 
 const mapLoader = new THREE.TextureLoader();
 const maxAnisotropy = this.threejs_.capabilities.getMaxAnisotropy();
