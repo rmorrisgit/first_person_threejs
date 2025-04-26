@@ -1,327 +1,161 @@
-import * as THREE from 'https://cdn.skypack.dev/three@0.136.0';
-import { PointerLockControls } from 'https://cdn.skypack.dev/three@0.136.0/examples/jsm/controls/PointerLockControls.js';
-import Stats from 'https://cdn.skypack.dev/three@0.136.0/examples/jsm/libs/stats.module.js';
 
-class CylinderGrid {
-  constructor(scene, cylinderSize, startHeight) {
-    this.scene = scene;
-    this.cylinderSize = cylinderSize; // Custom size for cylinders
-    this.startHeight = startHeight; // Initial height of cylinders
-    this.slotSize = this.cylinderSize * 2.5; // Spacing between cylinders
-    this.cylinders = []; // Store created cylinder meshes
-    this.grid = []; // Store grid positions
-  }
 
-  createGrid(size) {
-    const grid = [];
-    const totalSlots = size * size; // Should be 100 for a 10x10 grid
-    const filledSlots = Math.floor(totalSlots * 0.7); // Adjust fill ratio here
-    const filledIndices = new Set();
 
-    // Randomly fill slots based on the 0.7 fill ratio
-    while (filledIndices.size < filledSlots) {
-      const index = Math.floor(Math.random() * totalSlots);
-      filledIndices.add(index);
-    }
 
-    // Generate grid positions for filled slots
-    for (let x = 0; x < size; x++) {
-      for (let z = 0; z < size; z++) {
-        const index = x * size + z;
-        if (filledIndices.has(index)) {
-          const position = new THREE.Vector3(
-            x * this.slotSize - (size / 2 * this.slotSize), // Center the grid on the X axis
-            this.startHeight, // Start at the defined height
-            z * this.slotSize - (size / 2 * this.slotSize)  // Center the grid on the Z axis
-          );
-          grid.push(position);
-        }
-      }
-    }
 
-    this.grid = grid; // Store the generated grid positions
-    return grid;
-  }
 
-  createCylinder(position) {
-    const CYLINDER_DATA = {
-      radiusTop: this.cylinderSize,
-      radiusBottom: this.cylinderSize,
-      height: this.cylinderSize * 2,
-      radialSegments: 6,
-      heightSegments: 1,
-      openEnded: false,
-      thetaStart: 0,
-      thetaLength: 2 * Math.PI
-    };
 
-    // Create cylinder geometry and material
-    const cylinderGeometry = new THREE.CylinderGeometry(
-      CYLINDER_DATA.radiusTop,
-      CYLINDER_DATA.radiusBottom,
-      CYLINDER_DATA.height,
-      CYLINDER_DATA.radialSegments,
-      CYLINDER_DATA.heightSegments,
-      CYLINDER_DATA.openEnded,
-      CYLINDER_DATA.thetaStart,
-      CYLINDER_DATA.thetaLength
+
+
+
+
+
+
+// Function to get terrain height at specific (x, z) position
+const getTerrainHeight = (x, z) => {
+  const raycaster = new THREE.Raycaster();
+  raycaster.set(new THREE.Vector3(x, 50, z), new THREE.Vector3(0, -1, 0));  
+  const intersects = raycaster.intersectObject(terrain);
+  return intersects.length > 0 ? intersects[0].point.y : terrain.position.y;  
+};
+
+const treeModels = [];
+
+// Load each GLB tree model
+const loader3 = new GLTFLoader();
+const treePaths = [
+  'resources/Tree.glb',
+  'resources/TreeFall.glb',
+  'resources/TreeLarge.glb',
+  'resources/TreeFallLarge.glb'
+];
+  
+// Load each tree model and store promises
+const loadTreePromises = treePaths.map((path, index) =>
+  new Promise((resolve, reject) => {
+    loader3.load(
+      path,
+      (gltf) => {
+        const treeModel = gltf.scene;
+        treeModel.traverse((node) => {
+          if (node.isMesh) {
+            node.castShadow = true;
+            node.receiveShadow = true;
+          }
+        });
+        treeModels[index] = treeModel; // Store the loaded model
+        resolve();
+      },
+      undefined,
+      (error) => reject(error)
     );
-    const cylinderMaterial = new THREE.MeshPhongMaterial({ specular: 0xffffff, flatShading: true });
-    cylinderMaterial.color.setHSL(Math.random() * 0.2 + 0.5, 0.75, Math.random() * 0.25 + 0.75);
-    const cylinderMesh = new THREE.Mesh(cylinderGeometry, cylinderMaterial);
-    cylinderMesh.position.copy(position);
+  })
+);
 
-    // Compute bounding box for collision detection or other purposes
-    cylinderMesh.geometry.computeBoundingBox();
-    cylinderMesh.boundingBox = new THREE.Box3().setFromObject(cylinderMesh);
 
-    // Optional: Add a wireframe or bounding box helper
-    const wireframe = new THREE.LineSegments(
-      new THREE.EdgesGeometry(cylinderGeometry),
-      new THREE.LineBasicMaterial({ color: 0xff0000 })
-    );
-    wireframe.position.copy(position);
+// Wait for all tree models to load, then place trees
+Promise.all(loadTreePromises)
+  .then(() => {
+    placeTrees(terrain);
+  
+// Place trees on the mirrored terrain
+    console.log("All trees placed on the terrain.");
+  })
+  .catch((error) => console.error("Error loading tree models:", error));
+  
 
-    // Add cylinder and wireframe to the scene
-    this.scene.add(cylinderMesh);
-    this.scene.add(wireframe);
 
-    // Store the created cylinder mesh
-    this.cylinders.push(cylinderMesh);
-  }
 
-  createCylinders() {
-    // Create cylinders at all grid positions
-    this.grid.forEach(position => {
-      this.createCylinder(position);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+///////////////////////////////////////////////////////////////////////////////
+
+
+
+
+
+
+
+// Function to place trees on terrain
+// const placeTrees = () => {
+//   const numTrees = 80;
+
+//   // Define exclusion zone after rotation; let's say we want the north edge to be free of trees
+//   const exclusionZoneWidth = terrainWidth * 0.3; // Exclude 10% of terrain width on the specified side
+//   const exclusionStartX = terrain.position.x + terrainWidth / 2 - exclusionZoneWidth; // Adjusted for rotated terrain
+
+//   for (let i = 0; i < numTrees; i++) {
+//     const x = Math.random() * terrainWidth - terrainWidth / 2 + terrain.position.x;
+//     const z = Math.random() * terrainHeight - terrainHeight / 2 + terrain.position.z;
+  
+//     // Skip placing trees within 10% of the specified perpendicular edge along x-axis
+//     if (x > exclusionStartX && x < exclusionStartX + exclusionZoneWidth) continue;
+  
+//     const y = getTerrainHeight(x, z);
+//     const treeClone = treeModels[Math.floor(Math.random() * treeModels.length)].clone();
+//     treeClone.position.set(x, y, z);
+//     treeClone.rotation.y = Math.random() * Math.PI * 2;
+// // Set a larger range for more size variation
+// treeClone.scale.setScalar(2 + Math.random() * 2.5);
+//     this.scene_.add(treeClone);
+// }
+
+// };
+
+//////////////////////////////////////////////////////////////
+
+  loadMaterial_(name, tiling) {
+    const mapLoader = new THREE.TextureLoader();
+    const maxAnisotropy = this.threejs_.capabilities.getMaxAnisotropy();
+    const metalMap = mapLoader.load('resources/freepbr/' + name + 'metallic.png');
+
+    metalMap.anisotropy = maxAnisotropy;
+    metalMap.wrapS = THREE.RepeatWrapping;
+    metalMap.wrapT = THREE.RepeatWrapping;
+    metalMap.repeat.set(tiling, tiling);
+
+    const albedo = mapLoader.load('resources/freepbr/' + name + 'albedo.png');
+    albedo.anisotropy = maxAnisotropy;
+    albedo.wrapS = THREE.RepeatWrapping;
+    albedo.wrapT = THREE.RepeatWrapping;
+    albedo.repeat.set(tiling, tiling);
+    albedo.encoding = THREE.sRGBEncoding;
+
+    const normalMap = mapLoader.load('resources/freepbr/' + name + 'normal.png');
+    normalMap.anisotropy = maxAnisotropy;
+    normalMap.wrapS = THREE.RepeatWrapping;
+    normalMap.wrapT = THREE.RepeatWrapping;
+    normalMap.repeat.set(tiling, tiling);
+
+    const roughnessMap = mapLoader.load('resources/freepbr/' + name + 'roughness.png');
+    roughnessMap.anisotropy = maxAnisotropy;
+    roughnessMap.wrapS = THREE.RepeatWrapping;
+    roughnessMap.wrapT = THREE.RepeatWrapping;
+    roughnessMap.repeat.set(tiling, tiling);
+
+    const material = new THREE.MeshStandardMaterial({
+      metalnessMap: metalMap,
+      map: albedo,
+      normalMap: normalMap,
+      roughnessMap: roughnessMap,
     });
+
+    return material;
   }
 
-  spawnCylinders(count) {
-    const availablePositions = this.grid.slice(); // Copy the grid positions
-
-    for (let i = 0; i < count; i++) {
-      const randomIndex = Math.floor(Math.random() * availablePositions.length);
-      const position = availablePositions[randomIndex];
-
-      // Create a cylinder at a random available position
-      this.createCylinder(position);
-
-      // Remove the used position to avoid overlap
-      availablePositions.splice(randomIndex, 1);
-    }
-  }
-}
-
-function updateChargeUI(charge) {
-  const chargeDisplay = document.getElementById('charge-bar');
-  const chargeText = document.getElementById('charge-text');
-
-  if (chargeDisplay) {
-    // Clamp the charge value between 0 and 1
-    charge = Math.max(0, Math.min(1, charge));
-    chargeDisplay.style.width = `${charge * 100}%`; // Update the width of the UI element
-    chargeText.textContent = `${Math.round(charge * 100)}%`; // Display charge percentage
-  }
-}
-
-class FirstPersonCamera {
-  constructor(camera, cylinders) {
-    this.camera = camera;
-    this.cylinders = cylinders;
-    this.velocity = new THREE.Vector3();
-    this.direction = new THREE.Vector3();
-    this.canJump = true;
-    this.moveSpeed = 400; // speed in units per second
-    this.jumpSpeed = 350; // jump speed in units per second
-    this.gravity = -9.8 * 100; // gravity in units per second squared
-    this.charge = 1; // Player's sprint charge (from 0 to 1)
-    this.chargeDecreaseRate = 0.1; // Rate at which charge decreases when sprinting
-    this.rechargeRate = 0.05; // Rate at which charge recovers
-    this.controls = new PointerLockControls(camera, document.body);
-    this.raycaster = new THREE.Raycaster(new THREE.Vector3(), new THREE.Vector3(0, -1, 0), 0, 10);
-  }
-
-  init() {
-    document.addEventListener('keydown', (event) => this.onKeyDown(event));
-    document.addEventListener('keyup', (event) => this.onKeyUp(event));
-    document.addEventListener('click', () => this.controls.lock());
-  }
-
-  onKeyDown(event) {
-    switch (event.code) {
-      case 'ArrowUp':
-      case 'KeyW':
-        this.direction.z = -1;
-        break;
-      case 'ArrowLeft':
-      case 'KeyA':
-        this.direction.x = -1;
-        break;
-      case 'ArrowDown':
-      case 'KeyS':
-        this.direction.z = 1;
-        break;
-      case 'ArrowRight':
-      case 'KeyD':
-        this.direction.x = 1;
-        break;
-      case 'Space':
-        if (this.canJump) {
-          this.velocity.y = this.jumpSpeed;
-          this.canJump = false;
-        }
-        break;
-      case 'ShiftLeft':
-        if (this.charge > 0) {
-          this.moveSpeed = 600; // Increase speed when sprinting
-        }
-        break;
-    }
-  }
-
-  onKeyUp(event) {
-    switch (event.code) {
-      case 'ArrowUp':
-      case 'KeyW':
-      case 'ArrowDown':
-      case 'KeyS':
-        this.direction.z = 0;
-        break;
-      case 'ArrowLeft':
-      case 'KeyA':
-      case 'ArrowRight':
-      case 'KeyD':
-        this.direction.x = 0;
-        break;
-      case 'ShiftLeft':
-        this.moveSpeed = 400; // Reset speed when not sprinting
-        break;
-    }
-  }
-
-  update(delta) {
-    // Update velocity
-    this.velocity.x -= this.velocity.x * 10.0 * delta;
-    this.velocity.z -= this.velocity.z * 10.0 * delta;
-
-    this.velocity.y += this.gravity * delta; // apply gravity
-
-    // Calculate new position
-    this.direction.normalize(); // this ensures consistent movements in all directions
-    if (this.direction.z !== 0) this.velocity.z = this.moveSpeed * this.direction.z;
-    if (this.direction.x !== 0) this.velocity.x = this.moveSpeed * this.direction.x;
-
-    // Update charge if sprinting
-    if (this.moveSpeed > 400 && this.charge > 0) {
-      this.charge -= this.chargeDecreaseRate * delta;
-    } else if (this.charge < 1) {
-      this.charge += this.rechargeRate * delta;
-    }
-    updateChargeUI(this.charge);
-
-    // Perform the actual move
-    this.controls.moveRight(-this.velocity.x * delta);
-    this.controls.moveForward(-this.velocity.z * delta);
-    this.controls.getObject().position.y += this.velocity.y * delta; // Apply vertical velocity
-
-    // Collision detection with cylinders
-    this.raycaster.set(this.controls.getObject().position, new THREE.Vector3(0, -1, 0));
-    const intersects = this.raycaster.intersectObjects(this.cylinders);
-    if (intersects.length > 0) {
-      const nearestCylinder = intersects[0];
-      const cylinderHeight = nearestCylinder.object.geometry.parameters.height;
-      const cylinderTopY = nearestCylinder.object.position.y + (cylinderHeight / 2);
-      if (nearestCylinder.distance < 10 && this.controls.getObject().position.y > cylinderTopY) {
-        this.velocity.y = Math.max(0, this.velocity.y); // Prevent falling through the cylinder
-        this.controls.getObject().position.y = cylinderTopY + 0.1; // Set position just above the cylinder
-        this.canJump = true; // Allow jumping again
-      }
-    }
-
-    // Prevent falling below the ground
-    if (this.controls.getObject().position.y < 10) {
-      this.velocity.y = 0; // Reset vertical velocity
-      this.controls.getObject().position.y = 10; // Reset to ground level
-      this.canJump = true; // Allow jumping again
-    }
-  }
-}
-
-const scene = new THREE.Scene();
-
-// Add skybox
-const loader = new THREE.CubeTextureLoader();
-const texture = loader.load([
-  './resources/skybox/posx.jpg',
-  './resources/skybox/negx.jpg',
-  './resources/skybox/posy.jpg',
-  './resources/skybox/negy.jpg',
-  './resources/skybox/posz.jpg',
-  './resources/skybox/negz.jpg',
-]);
-texture.encoding = THREE.sRGBEncoding;
-scene.background = texture;
-
-const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 1, 1000);
-camera.position.set(0, 10, 10);
-
-const renderer = new THREE.WebGLRenderer({ antialias: true });
-renderer.setSize(window.innerWidth, window.innerHeight);
-renderer.shadowMap.enabled = true; // Enable shadows
-document.body.appendChild(renderer.domElement);
-
-// Add lighting to the scene
-const ambientLight = new THREE.AmbientLight(0x404040, 0.5); // Soft white light
-scene.add(ambientLight);
-
-const spotLight = new THREE.SpotLight(0xFFFFFF, 1);
-spotLight.position.set(15, 40, 35);
-spotLight.castShadow = true;
-spotLight.shadow.bias = -0.0001;
-spotLight.shadow.mapSize.width = 1024;
-spotLight.shadow.mapSize.height = 1024;
-scene.add(spotLight);
-
-const hemisphereLight = new THREE.HemisphereLight(0xffffbb, 0x080820, 0.6);
-scene.add(hemisphereLight);
-
-// Add plane (ground)
-const geometry = new THREE.PlaneGeometry(1000, 1000, 100, 100);
-const material = new THREE.MeshStandardMaterial({ color: 0x222222 });
-const plane = new THREE.Mesh(geometry, material);
-plane.rotation.x = -Math.PI / 2;
-plane.receiveShadow = true;
-scene.add(plane);
-
-// Create and add cylinders
-const cylinderGrid = new CylinderGrid(scene, 15, 0); // Adjust cylinder size and height as needed
-cylinderGrid.createGrid(10); // Create a 10x10 grid
-cylinderGrid.createCylinders(); // Add cylinders to the grid
-
-// Initialize first-person camera controls
-const fpsCamera = new FirstPersonCamera(camera, cylinderGrid.cylinders);
-fpsCamera.init();
-
-// Add Stats panel for monitoring FPS
-const stats = new Stats();
-document.body.appendChild(stats.dom);
-
-// Handle window resizing
-function onWindowResize() {
-  camera.aspect = window.innerWidth / window.innerHeight;
-  camera.updateProjectionMatrix();
-  renderer.setSize(window.innerWidth, window.innerHeight);
-}
-window.addEventListener('resize', onWindowResize, false);
-
-// Animation loop
-function animate() {
-  requestAnimationFrame(animate);
-  const delta = 0.016; // Assuming 60fps
-  fpsCamera.update(delta);
-  renderer.render(scene, camera);
-  stats.update();
-}
-
-animate();
+//////////////////////////////////////////////////////////////

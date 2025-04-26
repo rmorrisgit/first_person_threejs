@@ -10,8 +10,7 @@ const KEYS = {
   's': 83,
   'w': 87,
   'd': 68,
-  'shift': 16  // Add this line to define the Shift key
-
+  'shift': 16  
 };
 
 function clamp(x, a, b) {
@@ -25,6 +24,7 @@ const showInstructions = () => {
 const hideInstructions = () => {
   blocker.style.display = 'none'; // Hide instructions
 };
+
 // Modify the global click event to check for pointer lock state
 document.body.addEventListener('click', () => {
   if (!document.pointerLockElement) {
@@ -232,18 +232,18 @@ class FirstPersonCamera {
   this.groundLevel = this.baseHeight; // Set the ground level to the base height
   this.objects_ = objects;
   this.sceneObjects = sceneObjects || [];     // Audio listener setup
-  const listener = new THREE.AudioListener();
-  camera.add(listener);
-  this.footstepSound_ = new THREE.Audio(listener);
-  const audioLoader = new THREE.AudioLoader();
+  // const listener = new THREE.AudioListener();
+  // camera.add(listener);
+  // this.footstepSound_ = new THREE.Audio(listener);
+  // const audioLoader = new THREE.AudioLoader();
   // Load the footstep audio
-  audioLoader.load('./sounds/footstep.ogg', (buffer) => {
-    this.footstepSound_.setBuffer(buffer);
-    this.footstepSound_.setLoop(false); // Prevent looping
-    this.footstepSound_.setVolume(0.5);
-  }, undefined, (error) => {
-    console.error('An error occurred while loading the audio file:', error);
-  });
+  // audioLoader.load('./sounds/footstep.ogg', (buffer) => {
+  //   this.footstepSound_.setBuffer(buffer);
+  //   this.footstepSound_.setLoop(false); // Prevent looping
+  //   this.footstepSound_.setVolume(0.5);
+  // }, undefined, (error) => {
+  //   console.error('An error occurred while loading the audio file:', error);
+  // });
 
 
 
@@ -377,11 +377,11 @@ initializeKeycardAndDoor(handle, door, keycard, wiggleAction, doorAction) {
   updateHeadBob_(timeElapsedS) {
     if (this.isJumping) {
     // Do not apply head bobbing when jumping
-    this.headBobTimer_ = 0; // Optionally reset timer while jumping
-    if (this.footstepSound_.isPlaying) {
-        this.footstepSound_.stop(); // Stop sound if jumping
-    }
-    return; // Exit the method to avoid head bobbing
+    this.headBobTimer_ = 0; 
+    // if (this.footstepSound_.isPlaying) {
+    //     this.footstepSound_.stop(); 
+    // }
+    // return; 
     }
     if (this.headBobActive_) {
       const wavelength = Math.PI;
@@ -392,9 +392,9 @@ initializeKeycardAndDoor(handle, door, keycard, wiggleAction, doorAction) {
       if (this.headBobTimer_ == nextStepTime) {
         this.headBobActive_ = false;
       }    
-          if (this.footstepSound_.isPlaying) {
-            this.footstepSound_.stop();
-          }
+          // if (this.footstepSound_.isPlaying) {
+          //   this.footstepSound_.stop();
+          // }
       
     }
   }
@@ -565,9 +565,10 @@ loadModels_() {
     this.scene_.add(model);
 
     // Add each child mesh of the door to the separate door octree
+    // Ensures door collisions are separate
     model.traverse((child) => {
       if (child.isMesh) {
-          this.doorOctree.fromGraphNode(child);  // Ensures door collisions are separate
+          this.doorOctree.fromGraphNode(child);  
       }
   });
 
@@ -614,33 +615,40 @@ loadModels_() {
   });
 }
 
+// Show /  Hide instructions when locked
   onPointerLockChange_() {
     if (document.pointerLockElement === document.body) {
       console.log("Pointer Lock enabled");
-      hideInstructions();  // Hide instructions when locked
+      hideInstructions();  //
     } else {
       console.log("Pointer Lock disabled");
-      showInstructions();  // Show instructions when pointer lock is disabled
+      showInstructions();  
     }
   }
   initializeScene_() {
 
     // Octree must be initialized before adding objects to it
+
+
     if (!this.octree) {
     console.error("Octree is not initialized!");
     return;
     }
-    const loader = new THREE.CubeTextureLoader();
-    const texture = loader.load([
-        'resources/skybox/Cold_Sunset__Cam_2_Left+X.png',   // Left (-X)
-        'resources/skybox/Cold_Sunset__Cam_3_Right-X.png',  // Right (+X)
-        'resources/skybox/Cold_Sunset__Cam_4_Up+Y.png',     // Top (+Y)
-        'resources/skybox/Cold_Sunset__Cam_5_Down-Y.png',   // Bottom (-Y)
-        'resources/skybox/Cold_Sunset__Cam_0_Front+Z.png',  // Front (+Z)
-        'resources/skybox/Cold_Sunset__Cam_1_Back-Z.png'    // Back (-Z)
-    ]);
-    texture.encoding = THREE.sRGBEncoding;
-    this.scene_.background = texture;
+
+
+
+    
+    // const loader = new THREE.CubeTextureLoader();
+    // const texture = loader.load([
+    //     'resources/skybox/Cold_Sunset__Cam_2_Left+X.png',   // Left (-X)
+    //     'resources/skybox/Cold_Sunset__Cam_3_Right-X.png',  // Right (+X)
+    //     'resources/skybox/Cold_Sunset__Cam_4_Up+Y.png',     // Top (+Y)
+    //     'resources/skybox/Cold_Sunset__Cam_5_Down-Y.png',   // Bottom (-Y)
+    //     'resources/skybox/Cold_Sunset__Cam_0_Front+Z.png',  // Front (+Z)
+    //     'resources/skybox/Cold_Sunset__Cam_1_Back-Z.png'    // Back (-Z)
+    // ]);
+    // texture.encoding = THREE.sRGBEncoding;
+    // this.scene_.background = texture;
 
 // Ceiling Light Setup with RectAreaLight (for broader ceiling lighting)
 const xOffset = -3; // Horizontal offset to position the light across the X-axis
@@ -652,12 +660,6 @@ pointLight.position.set(xOffset, 1 + yOffset, zOffset);
 this.scene_.add(pointLight);
 // const pointLightHelper = new THREE.PointLightHelper(pointLight, 0.5);
 // this.scene_.add(pointLightHelper);
-// Light 1
-const light1 = new THREE.PointLight(0xff0000, 13, 20); // Red color, adjust intensity and distance
-light1.position.set(xOffset + 25, yOffset + 2, zOffset + -23);
-this.scene_.add(light1);
-// const lightHelper1 = new THREE.PointLightHelper(light1, 0.5);
-// this.scene_.add(lightHelper1);
 
 // Light 3
 const light3 = new THREE.PointLight(0xffffff, 20, 20); // Blue color
@@ -712,82 +714,6 @@ terrain.position.z = -5;
 this.scene_.add(terrain);
 
 
-// Function to get terrain height at specific (x, z) position
-const getTerrainHeight = (x, z) => {
-  const raycaster = new THREE.Raycaster();
-  raycaster.set(new THREE.Vector3(x, 50, z), new THREE.Vector3(0, -1, 0));  // Cast downward
-  const intersects = raycaster.intersectObject(terrain);
-  return intersects.length > 0 ? intersects[0].point.y : terrain.position.y;  // Return terrain base if no intersection
-};
-
-  const treeModels = [];
-
-  // Load each GLB tree model
-  const loader3 = new GLTFLoader();
-  const treePaths = [
-    'resources/Tree.glb',
-    'resources/TreeFall.glb',
-    'resources/TreeLarge.glb',
-    'resources/TreeFallLarge.glb'
-  ];
-  
-// Load each tree model and store promises
-const loadTreePromises = treePaths.map((path, index) =>
-  new Promise((resolve, reject) => {
-    loader3.load(
-      path,
-      (gltf) => {
-        const treeModel = gltf.scene;
-        treeModel.traverse((node) => {
-          if (node.isMesh) {
-            node.castShadow = true;
-            node.receiveShadow = true;
-          }
-        });
-        treeModels[index] = treeModel; // Store the loaded model
-        resolve();
-      },
-      undefined,
-      (error) => reject(error)
-    );
-  })
-);
-
-// Function to place trees on terrain
-const placeTrees = () => {
-  const numTrees = 80;
-
-  // Define exclusion zone after rotation; let's say we want the north edge to be free of trees
-  const exclusionZoneWidth = terrainWidth * 0.3; // Exclude 10% of terrain width on the specified side
-  const exclusionStartX = terrain.position.x + terrainWidth / 2 - exclusionZoneWidth; // Adjusted for rotated terrain
-
-  for (let i = 0; i < numTrees; i++) {
-    const x = Math.random() * terrainWidth - terrainWidth / 2 + terrain.position.x;
-    const z = Math.random() * terrainHeight - terrainHeight / 2 + terrain.position.z;
-  
-    // Skip placing trees within 10% of the specified perpendicular edge along x-axis
-    if (x > exclusionStartX && x < exclusionStartX + exclusionZoneWidth) continue;
-  
-    const y = getTerrainHeight(x, z);
-    const treeClone = treeModels[Math.floor(Math.random() * treeModels.length)].clone();
-    treeClone.position.set(x, y, z);
-    treeClone.rotation.y = Math.random() * Math.PI * 2;
-// Set a larger range for more size variation
-treeClone.scale.setScalar(2 + Math.random() * 2.5);
-    this.scene_.add(treeClone);
-}
-
-};
-// Wait for all tree models to load, then place trees
-Promise.all(loadTreePromises)
-  .then(() => {
-    placeTrees(terrain);
-  
-// Place trees on the mirrored terrain
-    console.log("All trees placed on the terrain.");
-  })
-  .catch((error) => console.error("Error loading tree models:", error));
-  
 
 const mapLoader = new THREE.TextureLoader();
 const maxAnisotropy = this.threejs_.capabilities.getMaxAnisotropy();
@@ -796,7 +722,7 @@ const maxAnisotropy = this.threejs_.capabilities.getMaxAnisotropy();
 const movingLight = new THREE.PointLight(0xff0000, 2, 100); // Start with red color
 this.scene_.add(movingLight);
 
-// Optional: Visualize the moving light position
+// PointLightHelper
 const lightHelper = new THREE.PointLightHelper(movingLight, 0.5);
 this.scene_.add(lightHelper);
 
@@ -808,7 +734,7 @@ this.lightHelper = lightHelper;
 const movingLight2 = new THREE.PointLight(0x0000ff, 2, 100);
 this.scene_.add(movingLight2);
 
-// Optional: Visualize the second moving light
+// PointLightHelper
 const lightHelper2 = new THREE.PointLightHelper(movingLight2, 0.5);
 this.scene_.add(lightHelper2);
 
@@ -872,16 +798,7 @@ loader4.load('resources/Dragon.glb', (gltf) => {
 });
 
     this.sceneObjects = [];
-
-    const meshes = [];
     this.objects_ = [];
-
-    // You can still create bounding boxes if needed, but don't pass them to raycasting
-    const boundingBoxes = meshes.map(mesh => {
-      const b = new THREE.Box3();
-      b.setFromObject(mesh);
-      return b;
-      });
 
       // Crosshair
       const crosshair = mapLoader.load('resources/ui/crosshair.png');
@@ -949,50 +866,6 @@ loader4.load('resources/Dragon.glb', (gltf) => {
     this.threejs_.setSize(window.innerWidth, window.innerHeight);
   }
 
-  loadMaterial_(name, tiling) {
-    const mapLoader = new THREE.TextureLoader();
-    const maxAnisotropy = this.threejs_.capabilities.getMaxAnisotropy();
-    const metalMap = mapLoader.load('resources/freepbr/' + name + 'metallic.png');
-
-    metalMap.anisotropy = maxAnisotropy;
-    metalMap.wrapS = THREE.RepeatWrapping;
-    metalMap.wrapT = THREE.RepeatWrapping;
-    metalMap.repeat.set(tiling, tiling);
-
-    const albedo = mapLoader.load('resources/freepbr/' + name + 'albedo.png');
-    albedo.anisotropy = maxAnisotropy;
-    albedo.wrapS = THREE.RepeatWrapping;
-    albedo.wrapT = THREE.RepeatWrapping;
-    albedo.repeat.set(tiling, tiling);
-    albedo.encoding = THREE.sRGBEncoding;
-
-    const normalMap = mapLoader.load('resources/freepbr/' + name + 'normal.png');
-    normalMap.anisotropy = maxAnisotropy;
-    normalMap.wrapS = THREE.RepeatWrapping;
-    normalMap.wrapT = THREE.RepeatWrapping;
-    normalMap.repeat.set(tiling, tiling);
-
-    const roughnessMap = mapLoader.load('resources/freepbr/' + name + 'roughness.png');
-    roughnessMap.anisotropy = maxAnisotropy;
-    roughnessMap.wrapS = THREE.RepeatWrapping;
-    roughnessMap.wrapT = THREE.RepeatWrapping;
-    roughnessMap.repeat.set(tiling, tiling);
-
-    const material = new THREE.MeshStandardMaterial({
-      metalnessMap: metalMap,
-      map: albedo,
-      normalMap: normalMap,
-      roughnessMap: roughnessMap,
-    });
-
-    return material;
-  }
-
-
-
- 
-
-
   createSecondaryScenes_() {
 
     this.secondaryCameras = [];
@@ -1001,7 +874,7 @@ loader4.load('resources/Dragon.glb', (gltf) => {
 
     // Set up secondary cameras and render targets for each screen
      // Set up secondary cameras and render targets for each screen
-  // Set up secondary cameras and render targets for each screen
+    // Set up secondary cameras and render targets for each screen
     for (let i = 0; i < 6; i++) {
         const camera = new THREE.PerspectiveCamera(cameraSettings.fov, cameraSettings.aspect, cameraSettings.near, cameraSettings.far);
         this.secondaryCameras.push(camera);
@@ -1014,15 +887,12 @@ loader4.load('resources/Dragon.glb', (gltf) => {
         this.renderTargets.push(renderTarget);
     }
 
-
-
     const loader = new GLTFLoader();
     loader.load('resources/democamz11.glb', (gltf) => {
         const model = gltf.scene;
         model.traverse((child) => {
           console.log("Object:", child.name);  // This will log all object names within the model
       });
-  // Load monmon33.glb if not already loaded
 
 
    // Look for the keycard (RootNode) within monmon33
@@ -1032,132 +902,112 @@ loader4.load('resources/Dragon.glb', (gltf) => {
      keycardObject.visible = false;
 
    } else {
-     console.error("Keycard object 'RootNode' not found in monmon33.");
+     console.error("Keycard object 'RootNode' not found in.");
    }
-
    // Define camera position mesh names
    const cameraMeshNames = [
     'NurbsPath', 'NurbsPath001', 'NurbsPath002', 
-    'NurbsPath003', 'NurbsPath004', 'NurbsPath005'
-];
+    'NurbsPath003', 'NurbsPath004', 'NurbsPath005' ];
 
-// Apply each camera mesh position to the corresponding secondary camera, with an offset
-const cameraOffset = 0.5; // Adjust this to move the camera back along its Z-axis
+    // Apply each camera mesh position to the corresponding secondary camera, with an offset
+    const cameraOffset = 0.5; 
+    cameraMeshNames.forEach((meshName, index) => {
+          const mesh = model.getObjectByName(meshName);
+                if (mesh && this.secondaryCameras[index]) {
+                    const camera = this.secondaryCameras[index];
 
-cameraMeshNames.forEach((meshName, index) => {
-       const mesh = model.getObjectByName(meshName);
-            if (mesh && this.secondaryCameras[index]) {
-                const camera = this.secondaryCameras[index];
+                    // Set position and apply an offset
+                    camera.position.copy(mesh.position);
+                    camera.translateZ(-cameraOffset);
 
-                // Set position and apply an offset
-                camera.position.copy(mesh.position);
-                camera.translateZ(-cameraOffset);
-
-        // Apply an offset along the local Z-axis to move the camera back slightly
-        this.secondaryCameras[index].translateZ(-cameraOffset);
-   // Turn the second camera left by 90 degrees
-   if (index === 0) {
-    camera.rotation.y += Math.PI / 2; // Rcam four
-
-    // Tilt down along the local axis by 10 degrees
-    const downTilt = new THREE.Quaternion();
-    downTilt.setFromAxisAngle(new THREE.Vector3(1, 0, 0), -Math.PI / 12); // Tilt down 10 degrees
-
-    // Combine the rotations
-    camera.quaternion.multiplyQuaternions(camera.quaternion, downTilt);   // Then tilt down
-    } else if(index === 2) {
-      camera.rotation.y += Math.PI / 2; // Rotate 90 degrees to the left
-          // Tilt down along the local axis by 10 degrees
-          const downTilt = new THREE.Quaternion();
-          downTilt.setFromAxisAngle(new THREE.Vector3(1, 0, 0), -Math.PI / 12); // Tilt down 10 degrees
+            // Apply an offset along the local Z-axis to move the camera back slightly
+            this.secondaryCameras[index].translateZ(-cameraOffset);
+      // Turn the second camera left by 90 degrees
+      if (index === 0) {
+        camera.rotation.y += Math.PI / 2; 
+        const downTilt = new THREE.Quaternion();
+        downTilt.setFromAxisAngle(new THREE.Vector3(1, 0, 0), -Math.PI / 12); // Tilt down 10 degrees
+        camera.quaternion.multiplyQuaternions(camera.quaternion, downTilt);   // Then tilt down
+        } else if(index === 2) {
+          camera.rotation.y += Math.PI / 2; // Rotate 90 degrees to the left
+              // Tilt down along the local axis by 10 degrees
+              const downTilt = new THREE.Quaternion();
+              downTilt.setFromAxisAngle(new THREE.Vector3(1, 0, 0), -Math.PI / 12); // Tilt down 10 degrees
       
           // Combine the rotations
           camera.quaternion.multiplyQuaternions(camera.quaternion, downTilt);   // Then tilt down
-    }else if
-      //cam two 
-    (index === 4) {
-      camera.rotation.y += Math.PI / 2; // Rotate 90 degrees to the left
-    }
-    else if (index === 3) {
-      camera.rotation.y += Math.PI / 2; // Rcam one
-
-
-    }else if
-    //cam two 
-    (index === 5) {
-    camera.rotation.y += Math.PI / 4; // Rotate 90 degrees to the left
-    }
-    // else if  (index === 5) {
-    //   camera.rotation.y += Math.PI / 2; // Rotate 90 degrees to the left
-    //   // cam three
-    // }
-
-
+        } else if (index === 4) {
+            camera.rotation.y += Math.PI / 2; // Rotate 90 degrees to the left
+        } else if (index === 3) {
+            camera.rotation.y += Math.PI / 2; // Rcam one
+        } else if (index === 5) {
+          camera.rotation.y += Math.PI / 4; // Rotate 90 degrees to the left
+        }
+            
         this.secondaryCameras[index].updateProjectionMatrix();
+            
         console.log(`Secondary camera ${index} set from ${meshName} with offset`);
-    } else {
-        console.warn(`Mesh ${meshName} or secondary camera ${index} not found`);
-    }
-});
+        } else {
+            console.warn(`Mesh ${meshName} or secondary camera ${index} not found`);
+        }
+    });
 
 
-        // Define monitor and screen names based on the structure
-        const monitorNames = [
-            'computerScreen006', 'computerScreen001', 'computerScreen002',
-            'computerScreen003', 'computerScreen004', 'computerScreen005'
-        ];
-        const screenNames = [
-            'Screen1_Plane006', 'Screen1_Plane001', 'Screen1_Plane002',
-            'Screen1_Plane003', 'Screen1_Plane004', 'Screen1_Plane005'
-        ];
+    // Define monitor and screen names based on the structure
+    const monitorNames = [
+        'computerScreen006', 'computerScreen001', 'computerScreen002',
+        'computerScreen003', 'computerScreen004', 'computerScreen005'
+    ];
+    const screenNames = [
+        'Screen1_Plane006', 'Screen1_Plane001', 'Screen1_Plane002',
+        'Screen1_Plane003', 'Screen1_Plane004', 'Screen1_Plane005'
+    ];
+
+      monitorNames.forEach((monitorName, i) => {
+          const monitor = model.getObjectByName(monitorName);
+  
+          if (monitor) {
+            const screen = monitor.getObjectByName(screenNames[i]);
+            if (screen) {
+                // Apply the render target to the screen
+                this.renderTargets[i].texture.flipY = false;
+                screen.material = new THREE.MeshBasicMaterial({
+                    map: this.renderTargets[i].texture,
+                    side: THREE.DoubleSide,
+                    toneMapped: false, // Ensure no tone mapping is applied to this specific material
+
+                });
+                console.log(`Applied render target to ${screenNames[i]} on ${monitorName}`);
     
-        monitorNames.forEach((monitorName, i) => {
-            const monitor = model.getObjectByName(monitorName);
+                // Get screen's world position
+                const screenWorldPosition = new THREE.Vector3();
+                screen.getWorldPosition(screenWorldPosition);
+
+                // Define RectAreaLight size and intensity
+                const lightWidth = 1.9;      // Adjust width as needed
+                const lightHeight = 1.2;     // Adjust height as needed
+                const lightIntensity = 1.8;  // Adjust intensity if necessary
     
-            if (monitor) {
-              const screen = monitor.getObjectByName(screenNames[i]);
-              if (screen) {
-                  // Apply the render target to the screen
-                  this.renderTargets[i].texture.flipY = false;
-                  screen.material = new THREE.MeshBasicMaterial({
-                      map: this.renderTargets[i].texture,
-                      side: THREE.DoubleSide,
-                      toneMapped: false, // Ensure no tone mapping is applied to this specific material
-
-                  });
-                  console.log(`Applied render target to ${screenNames[i]} on ${monitorName}`);
-      
-                  // Get screen's world position
-                  const screenWorldPosition = new THREE.Vector3();
-                  screen.getWorldPosition(screenWorldPosition);
-
-                  // Define RectAreaLight size and intensity
-                  const lightWidth = 1.9;      // Adjust width as needed
-                  const lightHeight = 1.2;     // Adjust height as needed
-                  const lightIntensity = 1.8;  // Adjust intensity if necessary
-      
-                  // Create and position RectAreaLight
-                  const rectLight = new RectAreaLight(0xffffff, lightIntensity, lightWidth, lightHeight);
-                  rectLight.position.set(
-                      screenWorldPosition.x,  // Set x position to screen's x
-                      screenWorldPosition.y,  // Set y position to screen's y
-                      screenWorldPosition.z + 0.3 // Slight z offset to position in front
-                  );
-                  
-                  rectLight.lookAt(screenWorldPosition); // Ensure light faces the screen
-                  this.scene_.add(rectLight);
-      
-                  // Optional: RectAreaLightHelper for visualization
-                  // const rectLightHelper = new RectAreaLightHelper(rectLight);
-                  // this.scene_.add(rectLightHelper);
-      
-              } else {
-                  console.error(`Screen ${screenNames[i]} not found in ${monitorName}`);
-              }
-          } else {
-              console.error(`${monitorName} not found in model`);
-          }
-      });
+                // Create and position RectAreaLight
+                const rectLight = new RectAreaLight(0xffffff, lightIntensity, lightWidth, lightHeight);
+                rectLight.position.set(
+                    screenWorldPosition.x,  // Set x position to screen's x
+                    screenWorldPosition.y,  // Set y position to screen's y
+                    screenWorldPosition.z + 0.3 // Slight z offset to position in front
+                );
+                
+                rectLight.lookAt(screenWorldPosition); // Ensure light faces the screen
+                this.scene_.add(rectLight);
+                // Optional: RectAreaLightHelper for visualization
+                // const rectLightHelper = new RectAreaLightHelper(rectLight);
+                // this.scene_.add(rectLightHelper);
+            } else {
+                console.error(`Screen ${screenNames[i]} not found in ${monitorName}`);
+            }
+        } else {
+            console.error(`${monitorName} not found in model`);
+        }
+    });
     
         // Add the entire model to the scene, preserving Blender's original positions
         this.scene_.add(model);
