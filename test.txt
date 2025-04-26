@@ -1,10 +1,84 @@
 
 
+//////////////////////////////////////////////////////////////////////////////////////
+
+  // const listener = new THREE.AudioListener();
+  // camera.add(listener);
+  // this.footstepSound_ = new THREE.Audio(listener);
+  // const audioLoader = new THREE.AudioLoader();
+  // Load the footstep audio
+  // audioLoader.load('./sounds/footstep.ogg', (buffer) => {
+  //   this.footstepSound_.setBuffer(buffer);
+  //   this.footstepSound_.setLoop(false); // Prevent looping
+  //   this.footstepSound_.setVolume(0.5);
+  // }, undefined, (error) => {
+  //   console.error('An error occurred while loading the audio file:', error);
+  // });
 
 
 
+///////////////////////////////////////////////////////////////////////////////
+  updateHeadBob_(timeElapsedS) {
+    if (this.isJumping) {
+    // Do not apply head bobbing when jumping
+    this.headBobTimer_ = 0; 
+    // if (this.footstepSound_.isPlaying) {
+    //     this.footstepSound_.stop(); 
+    // }
+    // return; 
+    }
+    if (this.headBobActive_) {
+      const wavelength = Math.PI;
+      const nextStep = 1 + Math.floor(((this.headBobTimer_ + 0.000001) * this.headBobSpeed_) / wavelength);
+      const nextStepTime = nextStep * wavelength / this.headBobSpeed_;
+      this.headBobTimer_ = Math.min(this.headBobTimer_ + timeElapsedS, nextStepTime);
+
+      if (this.headBobTimer_ == nextStepTime) {
+        this.headBobActive_ = false;
+      }    
+          // if (this.footstepSound_.isPlaying) {
+          //   this.footstepSound_.stop();
+          // }
+      
+    }
+  }
 
 
+///////////////////////////////////////////////////////////////////////////////////////
+
+
+  // Play footstep sound with a delay when moving and grounded
+  // if (this.isMoving) {
+  //     const currentTime = performance.now();
+  //     if (currentTime - (this.lastFootstepTime_ || 0) > 500) { // 500 ms delay
+  //         if (!this.footstepSound_.isPlaying) {
+  //             this.footstepSound_.play();
+  //             this.lastFootstepTime_ = currentTime; // Update the last footstep time
+  //         }
+  //     }
+  // } else {
+  //     if (this.footstepSound_.isPlaying) {
+  //         this.footstepSound_.stop();
+  //     }
+  //     this.headBobActive_ = false;
+  // }
+
+//////////////////////////////////////////////////////////////
+
+    // const loader = new THREE.CubeTextureLoader();
+    // const texture = loader.load([
+    //     'resources/skybox/Cold_Sunset__Cam_2_Left+X.png',   // Left (-X)
+    //     'resources/skybox/Cold_Sunset__Cam_3_Right-X.png',  // Right (+X)
+    //     'resources/skybox/Cold_Sunset__Cam_4_Up+Y.png',     // Top (+Y)
+    //     'resources/skybox/Cold_Sunset__Cam_5_Down-Y.png',   // Bottom (-Y)
+    //     'resources/skybox/Cold_Sunset__Cam_0_Front+Z.png',  // Front (+Z)
+    //     'resources/skybox/Cold_Sunset__Cam_1_Back-Z.png'    // Back (-Z)
+    // ]);
+    // texture.encoding = THREE.sRGBEncoding;
+    // this.scene_.background = texture;
+
+
+////////////////////////////////////////////////////////////////////////////////////////////////
 
 
 
@@ -159,3 +233,50 @@ Promise.all(loadTreePromises)
   }
 
 //////////////////////////////////////////////////////////////
+
+
+
+const terrainWidth = 80;
+const terrainHeight = 100;
+const segments = 100; // Higher segment count for more detail in height adjustments
+const flatEdgeMargin = 10; // Distance from the edges for standard flattening
+const extendedEastMargin = 190; // Extended margin for the east edge flattening
+
+const geometry = new THREE.PlaneGeometry(terrainWidth, terrainHeight, segments, segments);
+geometry.rotateX(-Math.PI / 2); // Rotate to lie flat on the X-Z plane
+
+const vertices = geometry.attributes.position.array;
+for (let i = 0; i < vertices.length; i += 3) {
+  const x = vertices[i];
+  const z = vertices[i + 2];
+
+  // Calculate the distance to each edge with different margins
+  const distanceToWestEdge = Math.max(0, ((-x) - (terrainWidth / 2 - flatEdgeMargin)) / flatEdgeMargin);
+  const distanceToNorthEdge = Math.max(0, (z - (terrainHeight / 2 - flatEdgeMargin)) / flatEdgeMargin);
+  const distanceToSouthEdge = Math.max(0, ((-z) - (terrainHeight / 2 - flatEdgeMargin)) / flatEdgeMargin);
+  
+  // Extended flattening for the east edge (positive X-axis)
+  const distanceToEastEdge = Math.max(0, (x - (terrainWidth / 2 - extendedEastMargin)) / extendedEastMargin);
+
+  // Apply the maximum distance as the edge factor, prioritizing the extended east edge
+  const edgeFactor = Math.max(distanceToWestEdge, distanceToNorthEdge, distanceToSouthEdge, distanceToEastEdge);
+
+  // Increase bumpiness with higher frequency in the center
+  const bumpFrequency = 0.3; // Higher frequency for more bumps
+  const height = Math.sin(x * bumpFrequency) * Math.cos(z * bumpFrequency) * 8; // Increase amplitude for taller bumps
+  vertices[i + 1] = height * (1 - edgeFactor); // Gradually reduce height to zero at the edges
+}
+
+geometry.attributes.position.needsUpdate = true;
+geometry.computeVertexNormals();
+
+// Create and add the terrain mesh
+const terrainMaterial = new THREE.MeshStandardMaterial({ color: 0xffffff, side: THREE.DoubleSide });
+const terrain = new THREE.Mesh(geometry, terrainMaterial);
+terrain.receiveShadow = true;
+
+terrain.position.y = -1; // Set to ground level
+terrain.position.x = -27;
+terrain.position.z = -5;
+
+this.scene_.add(terrain);
