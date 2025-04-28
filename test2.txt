@@ -13,7 +13,7 @@ renderer.setSize(window.innerWidth, window.innerHeight);
 document.body.appendChild(renderer.domElement);
 
 // === Custom Cursor (CSS) ===
-document.body.style.cursor = 'crosshair'; 
+document.body.style.cursor = 'crosshair';
 
 // === Capsule (Fake Character) ===
 const material = new THREE.MeshStandardMaterial({ color: 0x00ff00 });
@@ -42,7 +42,7 @@ const capBottom = new THREE.Mesh(
 capBottom.position.y = -0.5;
 capsuleGroup.add(capBottom);
 
-capsuleGroup.position.y = 1; // Slightly above ground
+capsuleGroup.position.y = 1;
 scene.add(capsuleGroup);
 
 // === Ground ===
@@ -64,26 +64,56 @@ scene.add(directionalLight);
 // === Movement Variables ===
 const moveSpeed = 5; // units per second
 let moveTarget = null;
+let isMouseDown = false;
 
-// Raycaster setup
+// === Click Marker Variables ===
+const clickMarkers = [];
+
+// === Raycaster setup ===
 const raycaster = new THREE.Raycaster();
 const mouse = new THREE.Vector2();
+const latestMouse = { x: 0, y: 0 };
 
-// Click handler
-window.addEventListener('click', (event) => {
-  // Normalize mouse coordinates
-  mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-  mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+// Update latest mouse position
+window.addEventListener('mousemove', (event) => {
+  latestMouse.x = event.clientX;
+  latestMouse.y = event.clientY;
+});
 
-  // Raycast from camera
+// Mouse press/release
+window.addEventListener('mousedown', (event) => {
+  isMouseDown = true;
+  updateMoveTarget(event.clientX, event.clientY, true); // true = spawn marker
+});
+
+window.addEventListener('mouseup', () => {
+  isMouseDown = false;
+});
+
+// Update move target function
+function updateMoveTarget(clientX, clientY, spawnMarker = false) {
+  mouse.x = (clientX / window.innerWidth) * 2 - 1;
+  mouse.y = -(clientY / window.innerHeight) * 2 + 1;
   raycaster.setFromCamera(mouse, camera);
-  const intersects = raycaster.intersectObject(ground);
 
+  const intersects = raycaster.intersectObject(ground);
   if (intersects.length > 0) {
     moveTarget = intersects[0].point.clone();
-    moveTarget.y = capsuleGroup.position.y; // Stay on ground level
+    moveTarget.y = capsuleGroup.position.y;
+
+    // Spawn Click Marker only if spawnMarker is true
+    if (spawnMarker) {
+      const markerGeometry = new THREE.CircleGeometry(0.3, 16);
+      const markerMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.8 });
+      const marker = new THREE.Mesh(markerGeometry, markerMaterial);
+      marker.rotation.x = -Math.PI / 2; // Face up
+      marker.position.copy(intersects[0].point);
+      marker.userData = { lifetime: 1.0 };
+      scene.add(marker);
+      clickMarkers.push(marker);
+    }
   }
-});
+}
 
 // === Animation Loop ===
 const clock = new THREE.Clock();
@@ -93,6 +123,25 @@ function animate() {
 
   const delta = clock.getDelta();
 
+  // Update click markers (shrink and fade out)
+  for (let i = clickMarkers.length - 1; i >= 0; i--) {
+    const marker = clickMarkers[i];
+    marker.userData.lifetime -= delta;
+
+    marker.scale.multiplyScalar(0.98);
+    marker.material.opacity *= 0.96;
+
+    if (marker.userData.lifetime <= 0) {
+      scene.remove(marker);
+      clickMarkers.splice(i, 1);
+    }
+  }
+
+  // Continuously update moveTarget while mouse held down
+  if (isMouseDown) {
+    updateMoveTarget(latestMouse.x, latestMouse.y);
+  }
+
   if (moveTarget) {
     const direction = moveTarget.clone().sub(capsuleGroup.position);
     const distance = direction.length();
@@ -101,11 +150,10 @@ function animate() {
       direction.normalize();
       capsuleGroup.position.add(direction.multiplyScalar(moveSpeed * delta));
       
-      // Rotate capsule to face movement direction
       const targetRotation = Math.atan2(direction.x, direction.z);
       capsuleGroup.rotation.y = targetRotation;
     } else {
-      moveTarget = null; // Reached target
+      moveTarget = null;
     }
   }
 
